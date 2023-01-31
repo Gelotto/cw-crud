@@ -1,8 +1,9 @@
 network ?= devnet  # network := devnet|mainnet|testnet
 contract_addr_filepath ?= $(release_dirpath)/contract_addr.txt
-wasm_filename ?= cw_contract_template.wasm
+wasm_filename ?= cw_crud.wasm
 release_dirpath ?= ./release
 sender ?= juno16g2rahf5846rxzp3fwlswy08fz8ccuwk03k57y
+desc ?= false
 
 # build optimized WASM artifact
 build:
@@ -14,7 +15,7 @@ deploy:
 
 # instantiate last contract to be deployed using code ID in release dir code-id file
 instantiate:
-	./bin/instantiate $(network) $(sender) $(value)
+	./bin/instantiate $(network) $(sender) $(acl_contract_addr)
 
 # run all unit tests
 test:
@@ -28,8 +29,14 @@ schemas:
 validator:
 	./bin/validator
 
-do-something:
-	./client.sh do-something $(network) $(contract_addr_filepath) $(sender) $(value)
+execute-create:
+	./client.sh create $(network) $(contract_addr_filepath) $(sender) $(code_id)
 
-get-something:
-	./client.sh get-something $(network) $(contract_addr_filepath) $(sender)
+execute-enable-acl:
+	./client.sh enable-acl $(network) $(contract_addr_filepath) $(sender)
+
+query-count:
+	./client.sh count $(network) $(contract_addr_filepath) $(sender)
+
+query-read:
+	./client.sh read $(network) $(contract_addr_filepath) $(index) $(desc)
