@@ -2,15 +2,14 @@
 
 NETWORK=$1
 SENDER=$2
-ACL_CONTRACT_ADDR=$3
-LABEL="cw-crud-$(date +%s)"
+ALLOWED_CODE_ID=$3
+LABEL="cw-repo-$(date +%s)"
 RELEASE_DIR="./release"
 FILE_TX_HASH="tx_hash.txt"
 FILE_CONTRACT_ADDR="contract_addr.txt"
 FILE_CODE_ID="code_id.txt"
 CODE_ID=$(cat $RELEASE_DIR/$FILE_CODE_ID)
-# INSTANTIATE_MSG='{"acl_contract_addr":"'$ACL_CONTRACT_ADDR'","default_label":"test"}'
-INSTANTIATE_MSG='{"default_label":"test","allowed_code_ids":[139]}'
+INSTANTIATE_MSG='{"default_label":"test","allowed_code_ids":['$ALLOWED_CODE_ID']}'
 
 set -e
 

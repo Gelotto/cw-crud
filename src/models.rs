@@ -28,9 +28,52 @@ pub enum IndexUpdateValues {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum IndexInitializationParams {
+  Numeric { idx: u8, value: u64 },
+  Timestamp { idx: u8, value: Timestamp },
+  Text { idx: u8, value: String },
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct IndexUpdate {
   pub index: u8,
   pub values: IndexUpdateValues,
+}
+
+impl IndexUpdate {
+  pub fn numeric(
+    index: u8,
+    old_value: u64,
+    new_value: u64,
+  ) -> Self {
+    Self {
+      index,
+      values: IndexUpdateValues::Numeric(old_value, new_value),
+    }
+  }
+
+  pub fn timestamp(
+    index: u8,
+    old_value: Timestamp,
+    new_value: Timestamp,
+  ) -> Self {
+    Self {
+      index,
+      values: IndexUpdateValues::Numeric(old_value.nanos(), new_value.nanos()),
+    }
+  }
+
+  pub fn text(
+    index: u8,
+    old_value: String,
+    new_value: String,
+  ) -> Self {
+    Self {
+      index,
+      values: IndexUpdateValues::Text(old_value, new_value),
+    }
+  }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]

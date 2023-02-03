@@ -14,6 +14,10 @@ pub fn update(
 ) -> Result<Response, ContractError> {
   let contract_addr = &info.sender;
 
+  deps
+    .api
+    .debug(format!("executing repository update for: {}", info.sender).as_str());
+
   if !owns_contract(deps.storage, contract_addr) {
     return Err(ContractError::NotAuthorized {});
   }
@@ -24,10 +28,17 @@ pub fn update(
   // update built-in indices
   IX_UPDATED_AT.remove(deps.storage, (meta.updated_at.nanos(), id));
   IX_UPDATED_AT.save(deps.storage, (env.block.time.nanos(), id), &true)?;
+
   IX_REV.remove(deps.storage, (meta.rev, id));
   IX_REV.save(deps.storage, (meta.rev + 1, id), &true)?;
 
-  // update custom indices
+  // update managed contract metadata
+  meta.updated_at = env.block.time;
+  meta.rev += 1;
+
+  METADATA.save(deps.storage, contract_addr.clone(), &meta)?;
+
+  // update other indices
   if let Some(view_updates) = index_updates {
     for vu in view_updates.iter() {
       match &vu.values {
@@ -40,12 +51,6 @@ pub fn update(
       }
     }
   }
-
-  // update managed contract metadata
-  meta.updated_at = env.block.time;
-  meta.rev += 1;
-
-  METADATA.save(deps.storage, contract_addr.clone(), &meta)?;
 
   Ok(Response::new().add_attributes(vec![attr("action", "update")]))
 }

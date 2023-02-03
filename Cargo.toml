@@ -1,9 +1,9 @@
 [package]
-name = "cw_crud"
+name = "cw_repo"
 version = "0.0.1"
 authors = []
 edition = "2018"
-description = "CRUD Smart Contract for managing collections of other contracts"
+description = "repository Smart Contract for managing collections of other contracts"
 license = "Apache-2.0"
 repository = ""
 homepage = ""

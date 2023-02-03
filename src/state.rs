@@ -11,10 +11,10 @@ pub type U64IndexMap<'a> = Map<'a, (u64, ContractID), bool>;
 pub type StrIndexMap<'a> = Map<'a, (String, ContractID), bool>;
 
 /// Identity of repo's creator
-pub const OWNER: Item<Addr> = Item::new("owner");
+pub const CREATED_BY: Item<Addr> = Item::new("created_by");
 
 /// whitelist for code ID's allowed instantiation via the create API
-pub const ALLOWED_CODE_IDS: Map<u64, bool> = Map::new("code_id_whitelist");
+pub const ALLOWED_CODE_IDS: Map<u64, bool> = Map::new("allowed_code_ids");
 
 /// Default label of contracts instantiated via the create API
 pub const DEFAULT_LABEL: Item<String> = Item::new("default_label");
@@ -39,11 +39,18 @@ pub const IX_CODE_ID: U64IndexMap = Map::new("ix_code_id");
 pub const IX_REV: U64IndexMap = Map::new("ix_rev");
 
 /// Custom index slots
+// TODO: add seperate maps for None values
 pub const IX_U64_0: U64IndexMap = Map::new("ix_u64_0");
 pub const IX_U64_1: U64IndexMap = Map::new("ix_u64_1");
 pub const IX_U64_2: U64IndexMap = Map::new("ix_u64_2");
 pub const IX_U64_3: U64IndexMap = Map::new("ix_u64_3");
 pub const IX_U64_4: U64IndexMap = Map::new("ix_u64_4");
+
+pub const IX_TS_0: U64IndexMap = Map::new("ix_ts_u64_0");
+pub const IX_TS_1: U64IndexMap = Map::new("ix_ts_u64_1");
+pub const IX_TS_2: U64IndexMap = Map::new("ix_ts_u64_2");
+pub const IX_TS_3: U64IndexMap = Map::new("ix_ts_u64_3");
+pub const IX_TS_4: U64IndexMap = Map::new("ix_ts_u64_4");
 
 pub const IX_STR_0: StrIndexMap = Map::new("ix_str_0");
 pub const IX_STR_1: StrIndexMap = Map::new("ix_str_1");
@@ -58,7 +65,7 @@ pub fn initialize(
   info: &MessageInfo,
   msg: &InstantiateMsg,
 ) -> Result<Response, ContractError> {
-  OWNER.save(deps.storage, &info.sender)?;
+  CREATED_BY.save(deps.storage, &info.sender)?;
   ACL_CONTRACT_ADDR.save(deps.storage, &msg.acl_address)?;
   DEFAULT_LABEL.save(deps.storage, &msg.default_label)?;
   COUNT.save(deps.storage, &0)?;
@@ -111,6 +118,17 @@ pub fn get_u64_index(index: u8) -> Result<U64IndexMap<'static>, ContractError> {
     2 => Ok(IX_U64_2),
     3 => Ok(IX_U64_3),
     4 => Ok(IX_U64_4),
+    _ => Err(ContractError::NotAuthorized {}),
+  }
+}
+
+pub fn get_timestamp_index(index: u8) -> Result<U64IndexMap<'static>, ContractError> {
+  match index {
+    0 => Ok(IX_TS_0),
+    1 => Ok(IX_TS_1),
+    2 => Ok(IX_TS_2),
+    3 => Ok(IX_TS_3),
+    4 => Ok(IX_TS_4),
     _ => Err(ContractError::NotAuthorized {}),
   }
 }

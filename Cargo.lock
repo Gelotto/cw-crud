@@ -320,7 +320,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "cw_crud"
+name = "cw_repo"
 version = "0.0.1"
 dependencies = [
  "base64 0.21.0",

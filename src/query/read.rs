@@ -1,12 +1,12 @@
 use std::marker::PhantomData;
 
-use cosmwasm_std::{Addr, Binary, Deps, Order, StdError, StdResult, Storage, Timestamp};
+use cosmwasm_std::{Addr, Deps, Order, StdError, StdResult, Storage, Timestamp};
 use cw_storage_plus::{Bound, Map, PrefixBound};
 
 use crate::{
   error::ContractError,
   models::{ContractID, IndexSelection},
-  msg::{ContractStateEnvelope, GetState, ReadResponse},
+  msg::{ContractStateEnvelope, ReadResponse, Select, Since},
   state::{
     get_str_index, get_u64_index, ID_2_ADDR, IX_CODE_ID, IX_CREATED_AT, IX_REV, IX_UPDATED_AT,
     METADATA,
@@ -20,12 +20,12 @@ pub const DEFAULT_LIMIT: u32 = 25;
 /// Return total number of contracts in the repo.
 pub fn read(
   deps: Deps,
-  target: &IndexSelection,
+  ix: &IndexSelection,
+  some_desc: Option<bool>,
   some_limit: Option<u32>,
-  desc: Option<bool>,
-  params: Option<Binary>,
-  some_modified_since: Option<Timestamp>,
-  verbose: Option<bool>,
+  some_fields: Option<Vec<String>>,
+  some_modified_since: Option<Since>,
+  some_include_meta: Option<bool>,
 ) -> Result<ReadResponse, ContractError> {
   // clamp limit to min and max bounds
   let limit = some_limit
@@ -33,7 +33,7 @@ pub fn read(
     .clamp(MIN_LIMIT, MAX_LIMIT);
 
   // resolve Order enum from desc flag
-  let order = if desc.unwrap_or(false) {
+  let order = if some_desc.unwrap_or(false) {
     Order::Descending
   } else {
     Order::Ascending
@@ -44,7 +44,7 @@ pub fn read(
   let mut bounds: Vec<Option<String>> = vec![None, None];
 
   // compute vec of contract ID's from an index
-  let contract_ids: Vec<ContractID> = match target.clone() {
+  let contract_ids: Vec<ContractID> = match ix.clone() {
     IndexSelection::CreatedAt { start, stop } => {
       bounds[0] = start.clone().and_then(|x| Some(x.nanos().to_string()));
       bounds[1] = stop.clone().and_then(|x| Some(x.nanos().to_string()));
@@ -87,33 +87,45 @@ pub fn read(
   let mut page: Vec<ContractStateEnvelope> = Vec::with_capacity(contract_ids.len());
   for id in contract_ids.iter() {
     let contract_addr = ID_2_ADDR.load(deps.storage, *id)?;
-    let some_meta = if verbose.unwrap_or(false) {
+    let some_meta = if some_include_meta.unwrap_or(false) {
       METADATA.may_load(deps.storage, contract_addr.clone())?
     } else {
       None
     };
 
-    //skip if not modified since modified_since timestamp
-    if let Some(modified_since) = some_modified_since {
+    //skip if not modified since modified_since revision or timestamp
+    if let Some(modified_since) = some_modified_since.clone() {
       let meta = if let Some(meta) = &some_meta {
         meta.clone()
       } else {
         METADATA.load(deps.storage, contract_addr.clone())?
       };
-      if meta.updated_at <= modified_since {
-        continue;
+      match modified_since {
+        Since::Rev(rev) => {
+          if meta.rev <= rev {
+            continue;
+          }
+        },
+        Since::Timestamp(time) => {
+          if meta.updated_at <= time {
+            continue;
+          }
+        },
       }
     }
 
-    // query state from contract via its GetState API implementation
-    let state = match &params {
-      None => None,
-      Some(params) => deps.querier.query_wasm_smart(
+    // query state from contract
+    let state = if some_fields.is_some() {
+      // an empty vec should be interpreted as "select *"
+      deps.querier.query_wasm_smart(
         contract_addr.clone(),
-        &GetState {
-          params: params.clone(),
+        &Select {
+          fields: some_fields.clone(),
         },
-      )?,
+      )?
+    } else {
+      // don't query the contract at all
+      None
     };
 
     page.push(ContractStateEnvelope {

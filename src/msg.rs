@@ -2,7 +2,7 @@ use cosmwasm_std::{Addr, Binary, Coin, Timestamp};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::models::{ContractMetadata, IndexSelection, IndexUpdate};
+use crate::models::{ContractMetadata, IndexInitializationParams, IndexSelection, IndexUpdate};
 
 /// Initial contract state.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -11,10 +11,6 @@ pub struct InstantiateMsg {
   pub acl_address: Option<Addr>,
   pub allowed_code_ids: Vec<u64>,
 }
-
-/// Initial contract state.
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct ClientInstantiateMsg {}
 
 /// Executable contract endpoints.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -26,9 +22,10 @@ pub enum ExecuteMsg {
     funds: Option<Vec<Coin>>,
     admin: Option<Addr>,
     label: Option<String>,
+    indices: Option<Vec<IndexInitializationParams>>,
   },
   Update {
-    views: Option<Vec<IndexUpdate>>,
+    indices: Option<Vec<IndexUpdate>>,
   },
 }
 
@@ -37,18 +34,35 @@ pub enum ExecuteMsg {
 #[serde(rename_all = "snake_case")]
 pub enum QueryMsg {
   Count {},
-  Read {
+  Select(Select),
+  ExecuteSelect {
     index: IndexSelection,
-    modified_since: Option<Timestamp>,
+    include: Option<Vec<String>>,
+    since: Option<Since>,
     limit: Option<u32>,
     desc: Option<bool>,
-    params: Option<Binary>,
-    verbose: Option<bool>,
+    meta: Option<bool>,
   },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum Since {
+  Rev(u64),
+  Timestamp(Timestamp),
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct CountResponse {
+  pub count: u64,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct SelectResponse {
+  pub created_by: Addr,
+  pub default_label: String,
+  pub allowed_code_ids: Vec<u64>,
+  pub acl_address: Option<Addr>,
   pub count: u64,
 }
 
@@ -61,8 +75,8 @@ pub struct ReadResponse {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct GetState {
-  pub params: Binary,
+pub struct Select {
+  pub fields: Option<Vec<String>>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]

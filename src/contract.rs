@@ -1,27 +1,21 @@
-#[cfg(not(feature = "library"))]
 use crate::error::ContractError;
 use crate::execute;
 use crate::models::ContractMetadata;
 use crate::msg::QueryMsg;
 use crate::msg::{ExecuteMsg, InstantiateMsg};
-use crate::query::{count, read};
+use crate::query::{count, read, select};
 use crate::state::{
   self, ADDR_2_ID, ID_2_ADDR, IX_CODE_ID, IX_CREATED_AT, IX_REV, IX_UPDATED_AT, METADATA,
 };
-// use base64::{
-//   alphabet,
-//   engine::{self, general_purpose},
-//   Engine as _,
-// };
 use cosmwasm_std::{
   entry_point, to_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, Reply, Response,
 };
 use cw2::set_contract_version;
 
-const CONTRACT_NAME: &str = "cw-crud";
+const CONTRACT_NAME: &str = "cw-repo";
 const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-#[cfg_attr(not(feature = "library"), entry_point)]
+#[entry_point]
 pub fn instantiate(
   deps: DepsMut,
   env: Env,
@@ -47,6 +41,7 @@ pub fn execute(
       admin,
       funds,
       label,
+      indices,
     } => execute::create::create(
       deps,
       env,
@@ -56,40 +51,34 @@ pub fn execute(
       admin,
       funds,
       label,
+      indices,
     ),
-    ExecuteMsg::Update { views } => execute::update::update(deps, env, info, views),
+    ExecuteMsg::Update { indices } => execute::update::update(deps, env, info, indices),
   }
 }
 
-#[cfg_attr(not(feature = "library"), entry_point)]
+#[entry_point]
 pub fn query(
   deps: Deps,
   _env: Env,
   msg: QueryMsg,
 ) -> Result<Binary, ContractError> {
   let result = match msg {
+    QueryMsg::Select(s) => to_binary(&select(deps, s.fields)?),
     QueryMsg::Count {} => to_binary(&count(deps)?),
-    QueryMsg::Read {
+    QueryMsg::ExecuteSelect {
       index,
       limit,
       desc,
-      params,
-      modified_since,
-      verbose,
-    } => to_binary(&read(
-      deps,
-      &index,
-      limit,
-      desc,
-      params,
-      modified_since,
-      verbose,
-    )?),
+      include,
+      since,
+      meta,
+    } => to_binary(&read(deps, &index, desc, limit, include, since, meta)?),
   }?;
   Ok(result)
 }
 
-#[cfg_attr(not(feature = "library"), entry_point)]
+#[entry_point]
 pub fn reply(
   deps: DepsMut,
   env: Env,
