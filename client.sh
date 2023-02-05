@@ -30,10 +30,10 @@ esac
 
 create() {
   sender=$1
-  code_id=$2
-  instantiate_msg=$3
-  b64_instantiate_msg=$(echo $instantiate_msg | base64)
-  msg='{"create":{"code_id":'$code_id',"instantiate_msg":"'$b64_instantiate_msg'"}}'
+  instantiate_msg=$2
+  b64_instantiate_msg="$(echo $instantiate_msg | ./bin/utils/b64-encode)"
+  b64_lucky_phrase="$(echo hello | ./bin/utils/b64-encode)"
+  msg='{"create":{"msg":"'$b64_instantiate_msg'","indices":[{"number":{"slot":0,"value":0}},{"text":{"slot":1,"value":"'$b64_lucky_phrase'"}}]}}'
   flags="\
   --node $NODE \
   --gas-prices 0.025$DENOM \
@@ -79,7 +79,7 @@ count() {
 }
 
 select_query() {
-  query='{"select":{}}'
+  query='{"select":{"fields":[]}}'
   flags="--chain-id $CHAIN_ID --output json --node $NODE"
   echo junod query wasm contract-state smart $CONTRACT_ADDR "$query" $flags
   response=$(junod query wasm contract-state smart $CONTRACT_ADDR "$query" $flags)
@@ -89,31 +89,36 @@ select_query() {
 read_index() {
   index=$1
   desc=$2
-  query='{"read":{"index":{"'$index'":{}},"desc":'$desc',"verbose":true}}'
+  limit=$3
+  query='{"read":{"index":{"'$index'":{}},"desc":'$desc',"fields":[],"limit":'$limit',"meta":false}}'
   flags="--chain-id $CHAIN_ID --output json --node $NODE"
   echo junod query wasm contract-state smart $CONTRACT_ADDR "$query" $flags
   response=$(junod query wasm contract-state smart $CONTRACT_ADDR "$query" $flags)
-  echo $response | ./bin/utils/base64-decode-attributes | jq
+  echo $response | ./bin/utils/b64-decode-state | jq
 }
 
-read_custom_index() {
-  index_type=$1
-  index_idx=$2
-  desc=$3
-  query='{"read":{"index":{"'$index_type'":{"idx":'$index_idx'}},"desc":'$desc',"verbose":true}}'
+read_string_index() {
+  slot=$1
+  desc=$2
+  equals=$3
+  if [ -z "$equals" ]; then
+    query='{"read":{"index":{"text":{"slot":'$slot'}},"fields":[],"desc":'$desc',"meta":true}}'
+  else
+    b64_equals="$(echo "$equals" | ./bin/utils/b64-encode)"
+    query='{"read":{"index":{"text":{"slot":'$slot',"equals":"'$b64_equals'"}},"fields":[],"desc":'$desc',"meta":false}}'
+  fi
   flags="--chain-id $CHAIN_ID --output json --node $NODE"
   echo junod query wasm contract-state smart $CONTRACT_ADDR "$query" $flags
   response=$(junod query wasm contract-state smart $CONTRACT_ADDR "$query" $flags)
-  echo $response | ./bin/utils/base64-decode-attributes | jq
+  echo $response | ./bin/utils/b64-decode-state | jq
 }
 
 
 set -e
 
-echo $*
 case $CMD in
   create)
-    create $1 $2 $3
+    create $1 $2
     ;;
   enable-acl)
     enable-acl $1
@@ -125,9 +130,9 @@ case $CMD in
     select_query
     ;;
   read) 
-    read_index $1 $2
+    read_index $1 $2 $3
     ;;
-  read-custom-index) 
-    read_custom_index $1 $2 $3
+  read-string-index)
+    read_string_index $1 $2 $3 $4
     ;;
 esac

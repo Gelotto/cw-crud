@@ -1,9 +1,10 @@
 network ?= devnet  # network := devnet|mainnet|testnet
 contract_addr_filepath ?= $(release_dirpath)/contract_addr.txt
-wasm_filename ?= cw_repo.wasm
+wasm_filename ?= cw_repository.wasm
 release_dirpath ?= ./release
 sender ?= juno16g2rahf5846rxzp3fwlswy08fz8ccuwk03k57y
 desc ?= false
+limit ?= 20
 
 # build optimized WASM artifact
 build:
@@ -30,7 +31,7 @@ validator:
 	./bin/validator
 
 execute-create:
-	./client.sh create $(network) $(contract_addr_filepath) $(sender) $(code_id) $(instantiate_msg)
+	./client.sh create $(network) $(contract_addr_filepath) $(sender) $(instantiate_msg)
 
 execute-enable-acl:
 	./client.sh enable-acl $(network) $(contract_addr_filepath) $(sender)
@@ -41,8 +42,8 @@ query-count:
 query-select:
 	./client.sh select $(network) $(contract_addr_filepath)
 
-query-read:
-	./client.sh read $(network) $(contract_addr_filepath) $(index) $(desc)
+read:
+	./client.sh read $(network) $(contract_addr_filepath) $(index) $(desc) $(limit)
 
-query-read-custom-index:
-	./client.sh read-custom-index $(network) $(contract_addr_filepath) $(index_type) $(index_name) $(desc)
+read-string-index:
+	./client.sh read-string-index $(network) $(contract_addr_filepath) $(slot) $(desc) $(equals)

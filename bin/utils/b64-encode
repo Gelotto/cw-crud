@@ -1,0 +1,8 @@
+#!/usr/bin/env python
+
+import base64
+import sys
+
+
+inp = sys.stdin.read().strip()
+print(base64.encodebytes(inp.encode()).decode().strip())

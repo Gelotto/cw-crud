@@ -1,12 +1,11 @@
 use crate::error::ContractError;
-use crate::execute;
 use crate::models::ContractMetadata;
 use crate::msg::QueryMsg;
 use crate::msg::{ExecuteMsg, InstantiateMsg};
-use crate::query::{count, read, select};
 use crate::state::{
-  self, ADDR_2_ID, ID_2_ADDR, IX_CODE_ID, IX_CREATED_AT, IX_REV, IX_UPDATED_AT, METADATA,
+  self, ADDR_2_ID, ID_2_ADDR, IX_CODE_ID, IX_CREATED_AT, IX_HEIGHT, IX_REV, IX_UPDATED_AT, METADATA,
 };
+use crate::{execute, query};
 use cosmwasm_std::{
   entry_point, to_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, Reply, Response,
 };
@@ -37,23 +36,23 @@ pub fn execute(
   match msg {
     ExecuteMsg::Create {
       code_id,
-      instantiate_msg,
+      msg: instantiate_msg,
       admin,
-      funds,
       label,
       indices,
-    } => execute::create::create(
+    } => execute::create(
       deps,
       env,
       info,
       code_id,
       &instantiate_msg,
       admin,
-      funds,
       label,
       indices,
     ),
-    ExecuteMsg::Update { indices } => execute::update::update(deps, env, info, indices),
+    ExecuteMsg::UpdateIndices { values } => execute::update_indices(deps, env, info, values),
+    ExecuteMsg::InsertIndices { values } => execute::insert_indices(deps, env, info, values),
+    ExecuteMsg::RenameIndex { name } => execute::rename_index(deps, env, info, name),
   }
 }
 
@@ -64,16 +63,19 @@ pub fn query(
   msg: QueryMsg,
 ) -> Result<Binary, ContractError> {
   let result = match msg {
-    QueryMsg::Select(s) => to_binary(&select(deps, s.fields)?),
-    QueryMsg::Count {} => to_binary(&count(deps)?),
-    QueryMsg::ExecuteSelect {
+    QueryMsg::Select { fields } => to_binary(&query::select(deps, fields)?),
+    QueryMsg::Count {} => to_binary(&query::count(deps)?),
+    QueryMsg::Read {
       index,
+      cursor,
       limit,
       desc,
-      include,
+      fields,
       since,
       meta,
-    } => to_binary(&read(deps, &index, desc, limit, include, since, meta)?),
+    } => to_binary(&query::read(
+      deps, &index, desc, limit, fields, since, meta, cursor,
+    )?),
   }?;
   Ok(result)
 }
@@ -111,6 +113,7 @@ pub fn reply(
           IX_REV.save(deps.storage, (rev, contract_id), &true)?;
           IX_CREATED_AT.save(deps.storage, (env.block.time.nanos(), contract_id), &true)?;
           IX_UPDATED_AT.save(deps.storage, (env.block.time.nanos(), contract_id), &true)?;
+          IX_HEIGHT.save(deps.storage, (env.block.height, contract_id), &true)?;
 
           ID_2_ADDR.save(deps.storage, reply.id, &contract_addr)?;
           ADDR_2_ID.save(deps.storage, contract_addr.clone(), &reply.id)?;

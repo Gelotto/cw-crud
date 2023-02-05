@@ -1,13 +1,15 @@
 use crate::{
   error::ContractError,
-  models::IndexInitializationParams,
+  models::IndexSlotValue,
   state::{
-    get_and_increment_count, get_str_index, get_timestamp_index, get_u64_index, is_allowed,
-    ALLOWED_CODE_IDS, DEFAULT_LABEL,
+    get_bool_index, get_next_contract_id, get_number_index, get_text_index, get_timestamp_index,
+    is_allowed, update_index_metadata_count, ALLOWED_CODE_IDS, BOOL_INDEX_METADATA,
+    DEFAULT_CODE_ID, DEFAULT_LABEL, IX_CREATED_BY, NUMBER_INDEX_METADATA, TEXT_INDEX_METADATA,
+    TS_INDEX_METADATA,
   },
 };
 use cosmwasm_std::{
-  attr, Addr, Binary, Coin, DepsMut, Env, MessageInfo, Response, Storage, SubMsg, WasmMsg,
+  attr, Addr, Binary, DepsMut, Env, MessageInfo, Response, Storage, SubMsg, WasmMsg,
 };
 
 /// Instantiate a managed contract. Extract its address in the reply entrypoint.
@@ -15,17 +17,19 @@ pub fn create(
   deps: DepsMut,
   _env: Env,
   info: MessageInfo,
-  code_id: u64,
+  code_id_override: Option<u64>,
   instantiate_msg: &Binary,
   admin: Option<Addr>,
-  funds: Option<Vec<Coin>>,
   label: Option<String>,
-  indices: Option<Vec<IndexInitializationParams>>,
+  indices: Option<Vec<IndexSlotValue>>,
 ) -> Result<Response, ContractError> {
   // the signer must be authorized to this method by the ACL
   if !is_allowed(deps.storage, &deps.querier, &info.sender, "create")? {
     return Err(ContractError::NotAuthorized {});
   }
+
+  // use specified code ID for fall back on default
+  let code_id = code_id_override.unwrap_or(DEFAULT_CODE_ID.load(deps.storage)?);
 
   // abort if code ID not whitelisted
   if !ALLOWED_CODE_IDS.has(deps.storage, code_id) {
@@ -37,22 +41,32 @@ pub fn create(
   // we use the existing count AKA size of the collection as the ID
   // of the instantiate submsg as well as for its default label, if
   // necessary.
-  let id = get_and_increment_count(deps.storage)?;
+  let contract_id = get_next_contract_id(deps.storage)?;
+
+  IX_CREATED_BY.save(deps.storage, (info.sender.clone(), contract_id), &true)?;
 
   // initialize custom indices
   for params in indices.unwrap_or(vec![]).clone().iter() {
     match params {
-      IndexInitializationParams::Numeric { idx, value } => {
-        let map = get_u64_index(*idx)?;
-        map.save(deps.storage, (*value, id), &true)?;
+      IndexSlotValue::Number { slot, value } => {
+        update_index_metadata_count(deps.storage, &NUMBER_INDEX_METADATA, *slot)?;
+        get_number_index(*slot)?.save(deps.storage, (*value, contract_id), &true)?;
       },
-      IndexInitializationParams::Timestamp { idx, value } => {
-        let map = get_timestamp_index(*idx)?;
-        map.save(deps.storage, (value.nanos(), id), &true)?;
+      IndexSlotValue::Timestamp { slot, value } => {
+        update_index_metadata_count(deps.storage, &TS_INDEX_METADATA, *slot)?;
+        get_timestamp_index(*slot)?.save(deps.storage, (value.nanos(), contract_id), &true)?;
       },
-      IndexInitializationParams::Text { idx, value } => {
-        let map = get_str_index(*idx)?;
-        map.save(deps.storage, (value.clone(), id), &true)?;
+      IndexSlotValue::Text { slot, value } => {
+        update_index_metadata_count(deps.storage, &TEXT_INDEX_METADATA, *slot)?;
+        get_text_index(*slot)?.save(deps.storage, (value.clone(), contract_id), &true)?;
+      },
+      IndexSlotValue::Boolean { slot, value } => {
+        update_index_metadata_count(deps.storage, &BOOL_INDEX_METADATA, *slot)?;
+        get_bool_index(*slot)?.save(
+          deps.storage,
+          (if *value { 1 } else { 0 }, contract_id),
+          &true,
+        )?;
       },
     }
   }
@@ -64,14 +78,14 @@ pub fn create(
     code_id,
     admin: admin.and_then(|addr| Some(addr.to_string())).or(None),
     msg: instantiate_msg.clone(),
-    funds: funds.unwrap_or(vec![]),
-    label: build_label(deps.storage, label, id)?,
+    funds: info.funds,
+    label: build_label(deps.storage, label, contract_id)?,
   };
 
   Ok(
     Response::new()
       .add_attributes(vec![attr("action", "create"), attr("code_id", info.sender)])
-      .add_submessage(SubMsg::reply_always(wasm_instantiate_msg, id)),
+      .add_submessage(SubMsg::reply_always(wasm_instantiate_msg, contract_id)),
   )
 }
 
@@ -84,7 +98,11 @@ fn build_label(
   if let Some(label) = custom_label {
     Ok(label)
   } else {
-    let base = DEFAULT_LABEL.load(storage)?;
-    Ok(format!("{}-{:?}", base, n))
+    let some_default_label = DEFAULT_LABEL.load(storage)?;
+    if let Some(default_label) = some_default_label {
+      Ok(format!("{}-{:?}", default_label, n))
+    } else {
+      Err(ContractError::LabelRequired {})
+    }
   }
 }

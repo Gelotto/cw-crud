@@ -43,7 +43,7 @@ await client.execute(
             // identified by an string name:
             indices: [{
                 numeric: {
-                    name: "count",
+                    slot: 0,
                     value: initialCounterValue
                 }
             }]
@@ -56,23 +56,17 @@ await client.execute(
 
 One there are a few contracts in a repo, you can query them and paginate the results via the `select` function. The results of a select consist of at least each contract address matched by the query but can also include metadata about each contract as well as state returned from each contract itself. To caching purposes, it is possible to prune the returned results to include only contracts that have been modified since a given block time or revision number.
 
-Continuing with the example above, suppose you'd like to paginage 20 at a time through Counter contracts that have been updated at least once and return their stored counter values (i.e. their `count` state), from greatest to least. We could do:
+Continuing with the example above, suppose you'd like to fetch the first 20 Counter contracts that have been updated at least once, returning their stored counters (i.e. their `count` state), ordered from greatest to least count. We could do:
 
 ```typescript
-let prevStare = 0;
 
 const result = await client.queryContractSmart(repoAddress, {
   select: {
+    index: { numeric: { slot: 0 } } },
     fields: ["count"],
-    index: {
-        numeric: {
-            name: "count"
-            start: prevStart
-        }
-    }
-    limit: 20,
-    desc: true,
     since: { rev: 1 }
+    desc: true,
+    limit: 20,
   },
 });
 ```

@@ -9,7 +9,7 @@ FILE_TX_HASH="tx_hash.txt"
 FILE_CONTRACT_ADDR="contract_addr.txt"
 FILE_CODE_ID="code_id.txt"
 CODE_ID=$(cat $RELEASE_DIR/$FILE_CODE_ID)
-INSTANTIATE_MSG='{"default_label":"test","allowed_code_ids":['$ALLOWED_CODE_ID']}'
+INSTANTIATE_MSG='{"default_label":"test","code_ids":['$ALLOWED_CODE_ID'],"indices":[{"number":{"slot":0,"name":"counter"}},{"text":{"slot":1,"name":"lucky_message"}}]}'
 
 set -e
 

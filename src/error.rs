@@ -12,6 +12,12 @@ pub enum ContractError {
   #[error("CreateFailed")]
   CreateFailed {},
 
+  #[error("InvalidLabel")]
+  InvalidLabel {},
+
+  #[error("NoAllowedCodeIds")]
+  NoAllowedCodeIds {},
+
   #[error("CodeIdNotAllowed")]
   CodeIdNotAllowed {},
 
@@ -21,6 +27,18 @@ pub enum ContractError {
   #[error("AlreadyExists")]
   AlreadyExists {},
 
-  #[error("NotInView")]
-  NotInView {},
+  #[error("NotInIndex")]
+  NotInIndex { msg: String },
+
+  #[error("QueryStateError")]
+  QueryStateError { msg: String },
+
+  #[error("ValidationError")]
+  ValidationError { msg: String },
+
+  #[error("LabelRequired")]
+  LabelRequired {},
+
+  #[error("InvalidIndexSlot")]
+  InvalidIndexSlot {},
 }

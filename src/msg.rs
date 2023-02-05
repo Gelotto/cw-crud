@@ -1,85 +1,92 @@
-use cosmwasm_std::{Addr, Binary, Coin, Timestamp};
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
+use cosmwasm_schema::cw_serde;
+use cosmwasm_std::{Addr, Binary, Timestamp};
 
-use crate::models::{ContractMetadata, IndexInitializationParams, IndexSelection, IndexUpdate};
+use crate::models::{
+  ContractID, ContractMetadata, IndexBounds, IndexMetadataView, IndexSlotName, IndexSlotValue,
+  IndexUpdate,
+};
 
-/// Initial contract state.
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[cw_serde]
 pub struct InstantiateMsg {
-  pub default_label: String,
   pub acl_address: Option<Addr>,
-  pub allowed_code_ids: Vec<u64>,
+  pub default_label: Option<String>,
+  pub default_code_id: Option<u64>,
+  pub code_ids: Vec<u64>,
+  pub indices: Option<Vec<IndexSlotName>>,
 }
 
-/// Executable contract endpoints.
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-#[serde(rename_all = "snake_case")]
+#[cw_serde]
 pub enum ExecuteMsg {
   Create {
-    code_id: u64,
-    instantiate_msg: Binary,
-    funds: Option<Vec<Coin>>,
+    code_id: Option<u64>,
+    msg: Binary,
     admin: Option<Addr>,
     label: Option<String>,
-    indices: Option<Vec<IndexInitializationParams>>,
+    indices: Option<Vec<IndexSlotValue>>,
   },
-  Update {
-    indices: Option<Vec<IndexUpdate>>,
+  InsertIndices {
+    values: Vec<IndexSlotValue>,
+  },
+  UpdateIndices {
+    values: Option<Vec<IndexUpdate>>,
+  },
+  RenameIndex {
+    name: IndexSlotName,
   },
 }
 
-/// Custom contract query endpoints.
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-#[serde(rename_all = "snake_case")]
+#[cw_serde]
 pub enum QueryMsg {
   Count {},
-  Select(Select),
-  ExecuteSelect {
-    index: IndexSelection,
-    include: Option<Vec<String>>,
+  Select {
+    fields: Option<Vec<String>>,
+  },
+  Read {
+    index: IndexBounds,
+    fields: Option<Vec<String>>,
     since: Option<Since>,
     limit: Option<u32>,
     desc: Option<bool>,
+    cursor: Option<(String, ContractID)>,
     meta: Option<bool>,
   },
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-#[serde(rename_all = "snake_case")]
+#[cw_serde]
 pub enum Since {
   Rev(u64),
   Timestamp(Timestamp),
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[cw_serde]
 pub struct CountResponse {
   pub count: u64,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[cw_serde]
 pub struct SelectResponse {
-  pub created_by: Addr,
-  pub default_label: String,
-  pub allowed_code_ids: Vec<u64>,
-  pub acl_address: Option<Addr>,
-  pub count: u64,
+  pub count: Option<u64>,
+  pub created_by: Option<Addr>,
+  pub default_label: Option<Option<String>>,
+  pub default_code_id: Option<u64>,
+  pub code_ids: Option<Vec<u64>>,
+  pub acl_address: Option<Option<Addr>>,
+  pub indices: Option<IndexMetadataView>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[cw_serde]
 pub struct ReadResponse {
   pub page: Vec<ContractStateEnvelope>,
+  pub cursor: Option<(String, ContractID)>,
   pub count: u8,
-  pub start: Option<String>,
-  pub stop: Option<String>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct Select {
-  pub fields: Option<Vec<String>>,
+#[cw_serde]
+pub enum ImplementorQueryMsg {
+  Select { fields: Option<Vec<String>> },
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[cw_serde]
 pub struct ContractStateEnvelope {
   pub address: Addr,
   pub meta: Option<ContractMetadata>,

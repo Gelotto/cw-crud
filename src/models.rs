@@ -1,11 +1,12 @@
+use base64::{engine::general_purpose as b64, Engine as _};
+use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{Addr, Timestamp};
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
 
 pub type ContractID = u64;
+pub type IndexTypeCode = u8;
+pub type Slot = u8;
 
-/// Initial contract state.
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[cw_serde]
 pub struct ContractMetadata {
   pub id: ContractID,
   pub height: u64,
@@ -14,99 +15,208 @@ pub struct ContractMetadata {
   pub rev: u64,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[cw_serde]
+pub struct IndexMetadata {
+  pub slot: Slot,
+  pub name: Option<String>,
+  pub updated_at: Option<Timestamp>,
+  pub updated_key: Option<(IndexPrefix, ContractID)>,
+  pub size: u64,
+}
+
+impl IndexMetadata {
+  pub fn new(
+    slot: Slot,
+    name: &Option<String>,
+  ) -> Self {
+    Self {
+      name: name.clone(),
+      updated_at: None,
+      updated_key: None,
+      size: 0,
+      slot,
+    }
+  }
+}
+
+#[cw_serde]
 pub struct KeyValue {
   pub key: String,
   pub value: String,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-#[serde(rename_all = "snake_case")]
+#[cw_serde]
+pub enum IndexPrefix {
+  Number(u64),
+  Text(String),
+  Timestamp(u64),
+  Boolean(u8),
+}
+
+#[cw_serde]
 pub enum IndexUpdateValues {
-  Numeric(u64, u64),
+  Number(u64, u64),
   Text(String, String),
+  Timestamp(Timestamp, Timestamp),
+  Boolean(bool, bool),
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum IndexInitializationParams {
-  Numeric { idx: u8, value: u64 },
-  Timestamp { idx: u8, value: Timestamp },
-  Text { idx: u8, value: String },
+#[cw_serde]
+pub enum IndexSlotValue {
+  Number { slot: Slot, value: u64 },
+  Timestamp { slot: Slot, value: Timestamp },
+  Text { slot: Slot, value: String },
+  Boolean { slot: Slot, value: bool },
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[cw_serde]
+pub enum IndexSlotName {
+  Number { slot: Slot, name: Option<String> },
+  Timestamp { slot: Slot, name: Option<String> },
+  Text { slot: Slot, name: Option<String> },
+  Boolean { slot: Slot, name: Option<String> },
+}
+
+#[cw_serde]
+pub enum IndexSlotNameValue {
+  Number {
+    slot: Slot,
+    name: Option<String>,
+    value: Option<u64>,
+  },
+  Timestamp {
+    slot: Slot,
+    name: Option<String>,
+    value: Option<Timestamp>,
+  },
+  Text {
+    slot: Slot,
+    name: Option<String>,
+    value: Option<String>,
+  },
+  Boolean {
+    slot: Slot,
+    name: Option<String>,
+    value: Option<bool>,
+  },
+}
+
+#[cw_serde]
 pub struct IndexUpdate {
-  pub index: u8,
+  pub slot: Slot,
   pub values: IndexUpdateValues,
 }
 
 impl IndexUpdate {
-  pub fn numeric(
-    index: u8,
+  pub fn number(
+    slot: Slot,
     old_value: u64,
     new_value: u64,
   ) -> Self {
     Self {
-      index,
-      values: IndexUpdateValues::Numeric(old_value, new_value),
+      slot,
+      values: IndexUpdateValues::Number(old_value, new_value),
     }
   }
 
   pub fn timestamp(
-    index: u8,
+    slot: Slot,
     old_value: Timestamp,
     new_value: Timestamp,
   ) -> Self {
     Self {
-      index,
-      values: IndexUpdateValues::Numeric(old_value.nanos(), new_value.nanos()),
+      slot,
+      values: IndexUpdateValues::Number(old_value.nanos(), new_value.nanos()),
+    }
+  }
+
+  pub fn boolean(
+    slot: Slot,
+    old_value: bool,
+    new_value: bool,
+  ) -> Self {
+    Self {
+      slot,
+      values: IndexUpdateValues::Boolean(old_value, new_value),
     }
   }
 
   pub fn text(
-    index: u8,
+    slot: Slot,
     old_value: String,
     new_value: String,
   ) -> Self {
     Self {
-      index,
-      values: IndexUpdateValues::Text(old_value, new_value),
+      slot,
+      values: IndexUpdateValues::Text(
+        b64::STANDARD.encode(&old_value),
+        b64::STANDARD.encode(&new_value),
+      ),
     }
   }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum IndexSelection {
+#[cw_serde]
+pub enum IndexBounds {
   CodeId {
-    start: Option<u64>,
-    stop: Option<u64>,
+    between: Option<(Option<u64>, Option<u64>)>,
+    equals: Option<u64>,
+  },
+  Height {
+    between: Option<(Option<u64>, Option<u64>)>,
+    equals: Option<u64>,
   },
   Address {
-    start: Option<Addr>,
-    stop: Option<Addr>,
+    between: Option<(Option<Addr>, Option<Addr>)>,
+    equals: Option<Addr>,
+  },
+  CreatedBy {
+    between: Option<(Option<Addr>, Option<Addr>)>,
+    equals: Option<Addr>,
   },
   CreatedAt {
-    start: Option<Timestamp>,
-    stop: Option<Timestamp>,
+    between: Option<(Option<Timestamp>, Option<Timestamp>)>,
+    equals: Option<Timestamp>,
   },
   UpdatedAt {
-    start: Option<Timestamp>,
-    stop: Option<Timestamp>,
+    between: Option<(Option<Timestamp>, Option<Timestamp>)>,
+    equals: Option<Timestamp>,
   },
-  Revision {
-    start: Option<u64>,
-    stop: Option<u64>,
+  Rev {
+    between: Option<(Option<u64>, Option<u64>)>,
+    equals: Option<u64>,
   },
-  Numeric {
-    idx: u8,
-    start: Option<u64>,
-    stop: Option<u64>,
+  Number {
+    slot: u8,
+    between: Option<(Option<u64>, Option<u64>)>,
+    equals: Option<u64>,
+  },
+  Timestamp {
+    slot: u8,
+    between: Option<(Option<Timestamp>, Option<Timestamp>)>,
+    equals: Option<Timestamp>,
   },
   Text {
-    idx: u8,
-    start: Option<String>,
-    stop: Option<String>,
+    slot: u8,
+    between: Option<(Option<String>, Option<String>)>,
+    equals: Option<String>,
   },
+  Boolean {
+    slot: u8,
+    start: Option<bool>,
+    stop: Option<bool>,
+  },
+}
+
+#[cw_serde]
+pub struct IndexMetadataView {
+  pub number: Vec<IndexMetadata>,
+  pub text: Vec<IndexMetadata>,
+  pub timestamp: Vec<IndexMetadata>,
+  pub boolean: Vec<IndexMetadata>,
+}
+
+#[cw_serde]
+pub struct Select {
+  pub fields: Option<Vec<String>>,
 }
