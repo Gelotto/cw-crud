@@ -1,10 +1,10 @@
 use crate::{
   error::ContractError,
-  models::IndexSlotValue,
+  models::{IndexKeys, IndexSlotValue, SLOT_COUNT},
   state::{
     get_bool_index, get_next_contract_id, get_number_index, get_text_index, get_timestamp_index,
-    is_allowed, update_index_metadata_count, ALLOWED_CODE_IDS, BOOL_INDEX_METADATA,
-    DEFAULT_CODE_ID, DEFAULT_LABEL, IX_CREATED_BY, NUMBER_INDEX_METADATA, TEXT_INDEX_METADATA,
+    increment_index_size, is_allowed, ALLOWED_CODE_IDS, BOOL_INDEX_METADATA, DEFAULT_CODE_ID,
+    DEFAULT_LABEL, ID_2_IX_KEYS, IX_CREATED_BY, NUMBER_INDEX_METADATA, TEXT_INDEX_METADATA,
     TS_INDEX_METADATA,
   },
 };
@@ -15,7 +15,7 @@ use cosmwasm_std::{
 /// Instantiate a managed contract. Extract its address in the reply entrypoint.
 pub fn create(
   deps: DepsMut,
-  _env: Env,
+  env: Env,
   info: MessageInfo,
   code_id_override: Option<u64>,
   instantiate_msg: &Binary,
@@ -45,43 +45,66 @@ pub fn create(
 
   IX_CREATED_BY.save(deps.storage, (info.sender.clone(), contract_id), &true)?;
 
+  // we use "keys" to keep track of which custom index keys are associated
+  // with the new contract ID because we'll need this for the sake up updating
+  // and removing contracts from the repo.
+  let mut keys = IndexKeys::new();
+
   // initialize custom indices
-  for params in indices.unwrap_or(vec![]).clone().iter() {
-    match params {
-      IndexSlotValue::Number { slot, value } => {
-        update_index_metadata_count(deps.storage, &NUMBER_INDEX_METADATA, *slot)?;
-        get_number_index(*slot)?.save(deps.storage, (*value, contract_id), &true)?;
-      },
-      IndexSlotValue::Timestamp { slot, value } => {
-        update_index_metadata_count(deps.storage, &TS_INDEX_METADATA, *slot)?;
-        get_timestamp_index(*slot)?.save(deps.storage, (value.nanos(), contract_id), &true)?;
-      },
-      IndexSlotValue::Text { slot, value } => {
-        update_index_metadata_count(deps.storage, &TEXT_INDEX_METADATA, *slot)?;
-        get_text_index(*slot)?.save(deps.storage, (value.clone(), contract_id), &true)?;
-      },
-      IndexSlotValue::Boolean { slot, value } => {
-        update_index_metadata_count(deps.storage, &BOOL_INDEX_METADATA, *slot)?;
-        get_bool_index(*slot)?.save(
-          deps.storage,
-          (if *value { 1 } else { 0 }, contract_id),
-          &true,
-        )?;
-      },
+  if let Some(indices) = indices {
+    for params in indices.iter() {
+      match params.clone() {
+        IndexSlotValue::Number { slot, value } => {
+          if slot >= SLOT_COUNT {
+            return Err(ContractError::SlotOutOfBounds { slot });
+          }
+          increment_index_size(deps.storage, &NUMBER_INDEX_METADATA, slot)?;
+          get_number_index(slot)?.save(deps.storage, (value, contract_id), &true)?;
+          keys.number[slot as usize] = Some(value);
+        },
+        IndexSlotValue::Timestamp { slot, value } => {
+          if slot >= SLOT_COUNT {
+            return Err(ContractError::SlotOutOfBounds { slot });
+          }
+          increment_index_size(deps.storage, &TS_INDEX_METADATA, slot)?;
+          get_timestamp_index(slot)?.save(deps.storage, (value.nanos(), contract_id), &true)?;
+          keys.timestamp[slot as usize] = Some(value.nanos());
+        },
+        IndexSlotValue::Text { slot, value } => {
+          if slot >= SLOT_COUNT {
+            return Err(ContractError::SlotOutOfBounds { slot });
+          }
+          increment_index_size(deps.storage, &TEXT_INDEX_METADATA, slot)?;
+          get_text_index(slot)?.save(deps.storage, (value.clone(), contract_id), &true)?;
+          keys.text[slot as usize] = Some(value.clone());
+        },
+        IndexSlotValue::Boolean { slot, value } => {
+          if slot >= SLOT_COUNT {
+            return Err(ContractError::SlotOutOfBounds { slot });
+          }
+          let u8_bool = if value { 1 } else { 0 };
+          increment_index_size(deps.storage, &BOOL_INDEX_METADATA, slot)?;
+          get_bool_index(slot)?.save(deps.storage, (u8_bool, contract_id), &true)?;
+          keys.boolean[slot as usize] = Some(u8_bool);
+        },
+      }
     }
   }
+
+  ID_2_IX_KEYS.save(deps.storage, contract_id, &keys)?;
 
   // create instantiation submsg. The instantiated contract should store the
   // sender address (of this repository contract) for it to use when calling update or
   // other methods defined by the Repository.
   let wasm_instantiate_msg = WasmMsg::Instantiate {
     code_id,
-    admin: admin.and_then(|addr| Some(addr.to_string())).or(None),
     msg: instantiate_msg.clone(),
     funds: info.funds,
     label: build_label(deps.storage, label, contract_id)?,
+    admin: admin
+      .and_then(|addr| Some(addr.to_string()))
+      .or(Some(env.contract.address.into())),
   };
-
   Ok(
     Response::new()
       .add_attributes(vec![attr("action", "create"), attr("code_id", info.sender)])

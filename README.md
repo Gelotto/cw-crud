@@ -1,9 +1,24 @@
-# CosmWasm "Repository" Smart Contract
+# CosmWasm Repository Contract
 
 This is a CosmWasm implementation of the [_repository design pattern_](https://deviq.com/design-patterns/repository-pattern).
 
 > Essentially, it provides an abstraction of data, so that your application can work with a simple abstraction that has an interface approximating that of a collection. Adding, removing, updating, and selecting items from this collection is done through a series of straightforward methods, without the need to deal with database concerns like connections, commands, cursors, or readers. Using this pattern can help achieve loose coupling and can keep domain objects persistence ignorant.
 
+In short, this is a contract that keeps track of other contracts. It lets you index their state and efficiently paginate them using custom orderings and field selectors. This lets you keep application data on-chain instead of in a database.
+
+## Is a repository right for you?
+
+If you answer "yes" to any of the following questions, this contract's for you!
+
+- Are you trying to keep your application state entirely on-chain?
+
+- Do you or your users regularly create instances of contracts that you need to track and display in a front end?
+
+- Do you want to paginate collections of contracts by date created, date updated, block time, block height, revision count, or custom textual, numeric, temporal, or boolean indices?
+
+If so, continue reading. Else, away with thee!
+
+<!--
 If your app is entirely on-chain and you are not using a database to store and contract addresses or state, this contract is for you. It lets you request and paginate collections of other contracts instantiated through it. It gives you efficient indexing, ordering, and pagination and a simple client to use from within other smart contracts.
 
 ## Example Use Case
@@ -69,4 +84,4 @@ const result = await client.queryContractSmart(repoAddress, {
     limit: 20,
   },
 });
-```
+``` -->

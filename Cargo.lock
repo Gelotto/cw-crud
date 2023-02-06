@@ -21,12 +21,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "904dfeac50f3cdaba28fc6f57fdcddb75f49ed61346676a78c4ffe55877802fd"
 
 [[package]]
-name = "base64"
-version = "0.21.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a4a4ddaa51a5bc52a6948f74c06d20aaaddb71924eab79b8c97a8c556e942d6a"
-
-[[package]]
 name = "base64ct"
 version = "1.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -126,7 +120,7 @@ version = "1.1.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b13d5a84d15cf7be17dc249a21588cdb0f7ef308907c50ce2723316a7d79c3dc"
 dependencies = [
- "base64 0.13.0",
+ "base64",
  "cosmwasm-crypto",
  "cosmwasm-derive",
  "derivative",
@@ -190,9 +184,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "cw-lib"
-version = "0.1.0"
+name = "cw-acl"
+version = "0.0.1"
 dependencies = [
+ "cosmwasm-schema",
  "cosmwasm-std",
  "cw-storage-plus",
  "cw-utils",
@@ -200,6 +195,7 @@ dependencies = [
  "cw20",
  "schemars",
  "serde",
+ "thiserror",
 ]
 
 [[package]]
@@ -277,10 +273,9 @@ dependencies = [
 name = "cw_repository"
 version = "0.0.1"
 dependencies = [
- "base64 0.21.0",
  "cosmwasm-schema",
  "cosmwasm-std",
- "cw-lib",
+ "cw-acl",
  "cw-multi-test",
  "cw-storage-plus",
  "cw-utils",

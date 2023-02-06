@@ -1,6 +1,7 @@
-use base64::{engine::general_purpose as b64, Engine as _};
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{Addr, Timestamp};
+
+pub const SLOT_COUNT: u8 = 5;
 
 pub type ContractID = u64;
 pub type IndexTypeCode = u8;
@@ -9,6 +10,7 @@ pub type Slot = u8;
 #[cw_serde]
 pub struct ContractMetadata {
   pub id: ContractID,
+  pub code_id: u64,
   pub height: u64,
   pub created_at: Timestamp,
   pub updated_at: Timestamp,
@@ -54,14 +56,6 @@ pub enum IndexPrefix {
 }
 
 #[cw_serde]
-pub enum IndexUpdateValues {
-  Number(u64, u64),
-  Text(String, String),
-  Timestamp(Timestamp, Timestamp),
-  Boolean(bool, bool),
-}
-
-#[cw_serde]
 pub enum IndexSlotValue {
   Number { slot: Slot, value: u64 },
   Timestamp { slot: Slot, value: Timestamp },
@@ -75,6 +69,33 @@ pub enum IndexSlotName {
   Timestamp { slot: Slot, name: Option<String> },
   Text { slot: Slot, name: Option<String> },
   Boolean { slot: Slot, name: Option<String> },
+}
+
+#[cw_serde]
+pub struct IndexKeys {
+  pub number: Vec<Option<u64>>,
+  pub text: Vec<Option<String>>,
+  pub timestamp: Vec<Option<u64>>,
+  pub boolean: Vec<Option<u8>>,
+}
+
+impl IndexKeys {
+  pub fn new() -> Self {
+    let mut number: Vec<Option<u64>> = Vec::with_capacity(SLOT_COUNT as usize);
+    let mut text: Vec<Option<String>> = Vec::with_capacity(SLOT_COUNT as usize);
+    let mut timestamp: Vec<Option<u64>> = Vec::with_capacity(SLOT_COUNT as usize);
+    let mut boolean: Vec<Option<u8>> = Vec::with_capacity(SLOT_COUNT as usize);
+    number.resize_with(SLOT_COUNT as usize, Option::default);
+    text.resize_with(SLOT_COUNT as usize, Option::default);
+    timestamp.resize_with(SLOT_COUNT as usize, Option::default);
+    boolean.resize_with(SLOT_COUNT as usize, Option::default);
+    Self {
+      number,
+      text,
+      timestamp,
+      boolean,
+    }
+  }
 }
 
 #[cw_serde]
@@ -99,61 +120,6 @@ pub enum IndexSlotNameValue {
     name: Option<String>,
     value: Option<bool>,
   },
-}
-
-#[cw_serde]
-pub struct IndexUpdate {
-  pub slot: Slot,
-  pub values: IndexUpdateValues,
-}
-
-impl IndexUpdate {
-  pub fn number(
-    slot: Slot,
-    old_value: u64,
-    new_value: u64,
-  ) -> Self {
-    Self {
-      slot,
-      values: IndexUpdateValues::Number(old_value, new_value),
-    }
-  }
-
-  pub fn timestamp(
-    slot: Slot,
-    old_value: Timestamp,
-    new_value: Timestamp,
-  ) -> Self {
-    Self {
-      slot,
-      values: IndexUpdateValues::Number(old_value.nanos(), new_value.nanos()),
-    }
-  }
-
-  pub fn boolean(
-    slot: Slot,
-    old_value: bool,
-    new_value: bool,
-  ) -> Self {
-    Self {
-      slot,
-      values: IndexUpdateValues::Boolean(old_value, new_value),
-    }
-  }
-
-  pub fn text(
-    slot: Slot,
-    old_value: String,
-    new_value: String,
-  ) -> Self {
-    Self {
-      slot,
-      values: IndexUpdateValues::Text(
-        b64::STANDARD.encode(&old_value),
-        b64::STANDARD.encode(&new_value),
-      ),
-    }
-  }
 }
 
 #[cw_serde]

@@ -1,10 +1,10 @@
-use crate::models::{ContractMetadata, IndexMetadata, IndexSlotName, Slot};
+use crate::models::{ContractMetadata, IndexKeys, IndexMetadata, IndexSlotName, Slot};
 use crate::msg::InstantiateMsg;
 use crate::{error::ContractError, models::ContractID};
 use cosmwasm_std::{
   Addr, DepsMut, Empty, Env, MessageInfo, QuerierWrapper, Response, StdResult, Storage,
 };
-use cw_lib::acl::api::is_allowed as is_allowed_by_acl;
+use cw_acl::client::Acl;
 use cw_storage_plus::{Item, Map};
 
 pub type NumberIndexMap<'a> = Map<'a, (u64, ContractID), bool>;
@@ -35,6 +35,10 @@ pub const ID_2_ADDR: Map<ContractID, Addr> = Map::new("id_2_addr");
 
 /// Lookup table from contract addr to ID
 pub const ADDR_2_ID: Map<Addr, ContractID> = Map::new("addr_2_id");
+
+/// Lookup table from contract ID to vecs of optional values to use as
+/// prefixes when looking up the entry in a custom index below
+pub const ID_2_IX_KEYS: Map<ContractID, IndexKeys> = Map::new("id_2_ix_keys");
 
 /// Metadata stored for each contract in this repo
 pub const METADATA: Map<Addr, ContractMetadata> = Map::new("contract_metadata");
@@ -139,7 +143,8 @@ pub fn initialize(
 }
 
 /// Helper function that returns true if given wallet (principal) is authorized
-/// by ACL to the given action.
+/// by ACL to the given action. If there's no ACL, we only authorize the sender
+/// if it is the created_by address.
 pub fn is_allowed(
   storage: &mut dyn Storage,
   querier: &QuerierWrapper<Empty>,
@@ -147,11 +152,11 @@ pub fn is_allowed(
   action: &str,
 ) -> Result<bool, ContractError> {
   if let Some(acl_addr) = ACL_CONTRACT_ADDR.load(storage)? {
-    if !is_allowed_by_acl(querier, &acl_addr, principal, action)? {
-      return Ok(false);
-    }
+    let acl = Acl::new(&acl_addr);
+    Ok(acl.is_allowed(querier, principal, action)?)
+  } else {
+    Ok(CREATED_BY.load(storage)? == *principal)
   }
-  Ok(true)
 }
 
 /// increment the collection count, returning pre-incremented value.
@@ -218,17 +223,39 @@ pub fn get_bool_index(slot: u8) -> Result<BoolIndexMap<'static>, ContractError> 
   }
 }
 
-pub fn update_index_metadata_count<'a>(
+pub fn increment_index_size<'a>(
   storage: &mut dyn Storage,
   map: &Map<'a, Slot, IndexMetadata>,
   slot: Slot,
+) -> Result<IndexMetadata, ContractError> {
+  update_index_size(storage, map, slot, 1, true)
+}
+
+pub fn decrement_index_size<'a>(
+  storage: &mut dyn Storage,
+  map: &Map<'a, Slot, IndexMetadata>,
+  slot: Slot,
+) -> Result<IndexMetadata, ContractError> {
+  update_index_size(storage, map, slot, 1, false)
+}
+
+fn update_index_size<'a>(
+  storage: &mut dyn Storage,
+  map: &Map<'a, Slot, IndexMetadata>,
+  slot: Slot,
+  delta: u64,
+  increment: bool,
 ) -> Result<IndexMetadata, ContractError> {
   Ok(map.update(
     storage,
     slot,
     |some_meta| -> Result<IndexMetadata, ContractError> {
       if let Some(mut meta) = some_meta {
-        meta.size += 1;
+        if increment {
+          meta.size += delta;
+        } else {
+          meta.size -= delta;
+        }
         Ok(meta)
       } else {
         // shouldn't be possible to reach this point

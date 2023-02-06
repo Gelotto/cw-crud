@@ -3,7 +3,6 @@ use cosmwasm_std::{Addr, Binary, Timestamp};
 
 use crate::models::{
   ContractID, ContractMetadata, IndexBounds, IndexMetadataView, IndexSlotName, IndexSlotValue,
-  IndexUpdate,
 };
 
 #[cw_serde]
@@ -24,14 +23,17 @@ pub enum ExecuteMsg {
     label: Option<String>,
     indices: Option<Vec<IndexSlotValue>>,
   },
-  InsertIndices {
-    values: Vec<IndexSlotValue>,
+  Update {
+    values: Option<Vec<IndexSlotValue>>,
   },
-  UpdateIndices {
-    values: Option<Vec<IndexUpdate>>,
+  Remove {
+    contract_addr: Addr,
   },
   RenameIndex {
     name: IndexSlotName,
+  },
+  SetAcl {
+    acl_contract_addr: Addr,
   },
 }
 

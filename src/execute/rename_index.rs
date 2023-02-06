@@ -1,6 +1,6 @@
 use crate::{
   error::ContractError,
-  models::{IndexMetadata, IndexSlotName, Slot},
+  models::{IndexMetadata, IndexSlotName, Slot, SLOT_COUNT},
   state::{
     is_allowed, BOOL_INDEX_METADATA, NUMBER_INDEX_METADATA, TEXT_INDEX_METADATA, TS_INDEX_METADATA,
   },
@@ -19,22 +19,42 @@ pub fn rename_index(
   }
 
   let (slot, (old_name, new_name)) = match name {
-    IndexSlotName::Number { slot, name } => (
-      slot,
-      update_index_name(deps.storage, &NUMBER_INDEX_METADATA, slot, &name)?,
-    ),
-    IndexSlotName::Timestamp { slot, name } => (
-      slot,
-      update_index_name(deps.storage, &TS_INDEX_METADATA, slot, &name)?,
-    ),
-    IndexSlotName::Text { slot, name } => (
-      slot,
-      update_index_name(deps.storage, &TEXT_INDEX_METADATA, slot, &name)?,
-    ),
-    IndexSlotName::Boolean { slot, name } => (
-      slot,
-      update_index_name(deps.storage, &BOOL_INDEX_METADATA, slot, &name)?,
-    ),
+    IndexSlotName::Number { slot, name } => {
+      if slot >= SLOT_COUNT {
+        return Err(ContractError::SlotOutOfBounds { slot });
+      }
+      (
+        slot,
+        update_index_name(deps.storage, &NUMBER_INDEX_METADATA, slot, &name)?,
+      )
+    },
+    IndexSlotName::Timestamp { slot, name } => {
+      if slot >= SLOT_COUNT {
+        return Err(ContractError::SlotOutOfBounds { slot });
+      }
+      (
+        slot,
+        update_index_name(deps.storage, &TS_INDEX_METADATA, slot, &name)?,
+      )
+    },
+    IndexSlotName::Text { slot, name } => {
+      if slot >= SLOT_COUNT {
+        return Err(ContractError::SlotOutOfBounds { slot });
+      }
+      (
+        slot,
+        update_index_name(deps.storage, &TEXT_INDEX_METADATA, slot, &name)?,
+      )
+    },
+    IndexSlotName::Boolean { slot, name } => {
+      if slot >= SLOT_COUNT {
+        return Err(ContractError::SlotOutOfBounds { slot });
+      }
+      (
+        slot,
+        update_index_name(deps.storage, &BOOL_INDEX_METADATA, slot, &name)?,
+      )
+    },
   };
 
   Ok(Response::new().add_attributes(vec![

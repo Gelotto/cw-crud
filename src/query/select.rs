@@ -2,8 +2,8 @@ use cosmwasm_std::{Deps, Order, StdResult, Storage};
 use cw_storage_plus::Map;
 
 use crate::{
-  client::Repository,
   error::ContractError,
+  loader::RepositoryStateLoader,
   models::{IndexMetadata, IndexMetadataView, Slot},
   msg::SelectResponse,
   state::{
@@ -16,7 +16,7 @@ pub fn select(
   deps: Deps,
   fields: Option<Vec<String>>,
 ) -> Result<SelectResponse, ContractError> {
-  let loader = Repository::loader(deps.storage, &fields);
+  let loader = RepositoryStateLoader::new(deps.storage, &fields);
   Ok(SelectResponse {
     count: loader.get("count", &COUNT)?,
     created_by: loader.get("created_by", &CREATED_BY)?,

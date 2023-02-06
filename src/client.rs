@@ -1,11 +1,10 @@
-use std::{collections::HashSet, iter::FromIterator};
-
 use cosmwasm_std::{to_binary, Addr, Binary, Empty, QuerierWrapper, StdResult, Storage, WasmMsg};
 use cw_storage_plus::Item;
 use serde::{de::DeserializeOwned, Serialize};
 
 use crate::{
-  models::{ContractID, IndexBounds, IndexUpdate},
+  loader::RepositoryStateLoader,
+  models::{ContractID, IndexBounds, IndexSlotValue},
   msg::{ExecuteMsg, QueryMsg, Since},
 };
 
@@ -54,14 +53,28 @@ impl Repository {
 
   pub fn update(
     &self,
-    indices: Vec<IndexUpdate>,
+    values: Vec<IndexSlotValue>,
   ) -> StdResult<WasmMsg> {
     Ok(WasmMsg::Execute {
       contract_addr: self.contract_addr.clone().into(),
-      msg: to_binary(&ExecuteMsg::UpdateIndices {
-        values: Some(indices.clone()),
-      })?,
       funds: vec![],
+      msg: to_binary(&ExecuteMsg::Update {
+        values: Some(
+          values
+            .iter()
+            .map(|v| {
+              if let IndexSlotValue::Text { slot, value } = v {
+                IndexSlotValue::Text {
+                  slot: *slot,
+                  value: Binary::from(value.as_bytes()).to_base64(),
+                }
+              } else {
+                v.clone()
+              }
+            })
+            .collect(),
+        ),
+      })?,
     })
   }
 
@@ -81,58 +94,6 @@ impl Repository {
       } else {
         Ok(None)
       }
-    } else {
-      Ok(None)
-    }
-  }
-}
-
-pub struct RepositoryStateLoader<'a> {
-  storage: &'a dyn Storage,
-  fields: HashSet<String>,
-}
-
-impl<'a> RepositoryStateLoader<'a> {
-  pub fn new(
-    storage: &'a dyn Storage,
-    fields: &Option<Vec<String>>,
-  ) -> Self {
-    Self {
-      storage: storage,
-      fields: if let Some(fields_vec) = fields {
-        HashSet::from_iter(fields_vec.iter().map(|x| x.clone()))
-      } else {
-        HashSet::new()
-      },
-    }
-  }
-
-  pub fn get<'b, T>(
-    &self,
-    field: &str,
-    item: &Item<'b, T>,
-  ) -> StdResult<Option<T>>
-  where
-    T: DeserializeOwned,
-    T: Serialize,
-  {
-    if self.fields.is_empty() || self.fields.contains(&field.to_owned()) {
-      item.may_load(self.storage)
-    } else {
-      Ok(None)
-    }
-  }
-
-  pub fn view<T, F>(
-    &self,
-    field: &str,
-    func: F,
-  ) -> StdResult<Option<T>>
-  where
-    F: Fn() -> StdResult<Option<T>>,
-  {
-    if self.fields.is_empty() || self.fields.contains(&field.to_owned()) {
-      func()
     } else {
       Ok(None)
     }

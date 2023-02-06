@@ -1,9 +1,11 @@
 mod create;
-mod insert_indices;
+mod remove;
 mod rename_index;
-mod update_indices;
+mod set_acl;
+mod update;
 
 pub use create::create;
-pub use insert_indices::insert_indices;
+pub use remove::remove;
 pub use rename_index::rename_index;
-pub use update_indices::update_indices;
+pub use set_acl::set_acl;
+pub use update::update;

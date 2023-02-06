@@ -50,9 +50,12 @@ pub fn execute(
       label,
       indices,
     ),
-    ExecuteMsg::UpdateIndices { values } => execute::update_indices(deps, env, info, values),
-    ExecuteMsg::InsertIndices { values } => execute::insert_indices(deps, env, info, values),
+    ExecuteMsg::Update { values } => execute::update(deps, env, info, values),
     ExecuteMsg::RenameIndex { name } => execute::rename_index(deps, env, info, name),
+    ExecuteMsg::Remove { contract_addr } => execute::remove(deps, env, info, &contract_addr),
+    ExecuteMsg::SetAcl { acl_contract_addr } => {
+      execute::set_acl(deps, env, info, &acl_contract_addr)
+    },
   }
 }
 
@@ -102,9 +105,12 @@ pub fn reply(
             return Ok(Response::default());
           }
 
+          let mut contract_code_id = 0u64;
+
           if let Some(attr) = e.attributes.iter().find(|attr| attr.key == "code_id") {
             if let Ok(code_id) = u64::from_str_radix(&attr.value, 10) {
               IX_CODE_ID.save(deps.storage, (code_id, contract_id), &true)?;
+              contract_code_id = code_id;
             } else {
               return Err(ContractError::CreateFailed {});
             }
@@ -123,6 +129,7 @@ pub fn reply(
             contract_addr.clone(),
             &ContractMetadata {
               id: reply.id,
+              code_id: contract_code_id,
               height: env.block.height,
               created_at: env.block.time,
               updated_at: env.block.time,

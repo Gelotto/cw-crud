@@ -1,6 +1,8 @@
 use cosmwasm_std::StdError;
 use thiserror::Error;
 
+use crate::models::Slot;
+
 #[derive(Debug, Error)]
 pub enum ContractError {
   #[error("{0}")]
@@ -41,4 +43,7 @@ pub enum ContractError {
 
   #[error("InvalidIndexSlot")]
   InvalidIndexSlot {},
+
+  #[error("SlotOutOfBounds")]
+  SlotOutOfBounds { slot: Slot },
 }
