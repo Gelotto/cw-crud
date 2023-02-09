@@ -33,8 +33,7 @@ create() {
   instantiate_msg=$2
   b64_instantiate_msg="$(echo $instantiate_msg | ./bin/utils/b64-encode)"
   b64_lucky_phrase="$(echo hello | ./bin/utils/b64-encode)"
-  # msg='{"create":{"msg":"'$b64_instantiate_msg'","indices":[{"number":{"slot":0,"value":0}},{"text":{"slot":1,"value":"'$b64_lucky_phrase'"}}]}}'
-  msg='{"create":{"msg":"'$b64_instantiate_msg'"}}'
+  msg='{"create":{"msg":"'$b64_instantiate_msg'","indices":[{"number":{"slot":0,"value":0}},{"text":{"slot":1,"value":"'$b64_lucky_phrase'"}}]}}'
   flags="\
   --node $NODE \
   --gas-prices 0.025$DENOM \

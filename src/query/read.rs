@@ -11,8 +11,8 @@ use crate::{
   models::{ContractID, IndexBounds},
   msg::{ContractStateEnvelope, ImplementorQueryMsg, ReadResponse, Since},
   state::{
-    get_bool_index, get_number_index, get_text_index, get_timestamp_index, ID_2_ADDR, IX_CODE_ID,
-    IX_CREATED_AT, IX_CREATED_BY, IX_HEIGHT, IX_REV, IX_UPDATED_AT, METADATA,
+    get_bool_index, get_text_index, get_timestamp_index, get_u128_index, get_u64_index, ID_2_ADDR,
+    IX_CODE_ID, IX_CREATED_AT, IX_CREATED_BY, IX_HEIGHT, IX_REV, IX_UPDATED_AT, METADATA,
   },
 };
 
@@ -63,12 +63,12 @@ pub fn read(
       let ix = &IX_UPDATED_AT;
       paginate_ts_index(store, ix, equals, between, order, limit, cursor)?
     },
-    IndexBounds::Number {
+    IndexBounds::Uint64 {
       slot,
       between,
       equals,
     } => {
-      let map = &get_number_index(slot)?;
+      let map = &get_u64_index(slot)?;
       paginate_u64_index(deps.storage, map, equals, between, order, limit, cursor)?
     },
     IndexBounds::Text {
@@ -102,6 +102,14 @@ pub fn read(
     IndexBounds::Boolean { slot, start, stop } => {
       let map = get_bool_index(slot)?;
       paginate_bool_index(deps.storage, &map, start, stop, order, limit, cursor)?
+    },
+    IndexBounds::Uint128 {
+      slot,
+      between,
+      equals,
+    } => {
+      let map = &get_u128_index(slot)?;
+      paginate_u128_index(deps.storage, map, equals, between, order, limit, cursor)?
     },
   };
 
@@ -338,6 +346,67 @@ fn paginate_addr_index<'a>(
     iter,
     limit,
     |(addr, id), _| -> Result<(String, ContractID), ContractError> { Ok((addr.to_string(), id)) },
+  );
+}
+
+fn paginate_u128_index<'a>(
+  store: &dyn Storage,
+  map: &Map<'a, (u128, ContractID), bool>,
+  equals: Option<u128>,
+  between: Option<(Option<u128>, Option<u128>)>,
+  order: Order,
+  limit: u32,
+  cursor: Option<(String, ContractID)>,
+) -> Result<Vec<(String, ContractID)>, ContractError> {
+  let (start, stop, is_exclusive) = if let Some(value) = equals {
+    (Some(value), Some(value), false)
+  } else if let Some((lower, upper)) = between {
+    (lower, upper, true)
+  } else {
+    (None, None, true)
+  };
+
+  let iter = if let Some((x, id)) = cursor {
+    map.range(
+      store,
+      match u128::from_str_radix(x.as_str(), 10) {
+        Ok(x) => Some(Bound::Exclusive(((x, id), PhantomData))),
+        Err(_) => None,
+      },
+      stop
+        .and_then(|x| {
+          Some(if is_exclusive {
+            Bound::Exclusive(((x, 0), PhantomData))
+          } else {
+            Bound::Inclusive(((x, ContractID::MAX), PhantomData))
+          })
+        })
+        .or(None),
+      order,
+    )
+  } else {
+    map.prefix_range(
+      store,
+      start
+        .and_then(|n| Some(PrefixBound::Inclusive((n, PhantomData))))
+        .or(None),
+      stop
+        .and_then(|n| {
+          Some(if is_exclusive {
+            PrefixBound::Exclusive((n, PhantomData))
+          } else {
+            PrefixBound::Inclusive((n, PhantomData))
+          })
+        })
+        .or(None),
+      order,
+    )
+  };
+
+  return collect(
+    iter,
+    limit,
+    |(x, id), _| -> Result<(String, ContractID), ContractError> { Ok((x.to_string(), id)) },
   );
 }
 

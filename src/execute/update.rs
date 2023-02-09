@@ -2,9 +2,10 @@ use crate::{
   error::ContractError,
   models::{ContractID, IndexMetadata, IndexPrefix, IndexSlotValue, Slot, SLOT_COUNT},
   state::{
-    get_bool_index, get_contract_id, get_number_index, get_text_index, get_timestamp_index,
-    increment_index_size, BOOL_INDEX_METADATA, ID_2_IX_KEYS, IX_REV, METADATA,
-    NUMBER_INDEX_METADATA, TEXT_INDEX_METADATA, TS_INDEX_METADATA,
+    get_bool_index, get_contract_id, get_text_index, get_timestamp_index, get_u128_index,
+    get_u64_index, increment_index_size, BOOL_INDEX_METADATA, ID_2_INDEXED_VALUES, IX_REV,
+    METADATA, TEXT_INDEX_METADATA, TS_INDEX_METADATA, UINT128_INDEX_METADATA,
+    UINT64_INDEX_METADATA,
   },
   state::{owns_contract, IX_UPDATED_AT},
 };
@@ -58,17 +59,17 @@ pub fn update(
 
   // update other indices
   if let Some(updates) = index_updates {
-    let mut ix_keys = ID_2_IX_KEYS.load(deps.storage, contract_id)?;
+    let mut ix_keys = ID_2_INDEXED_VALUES.load(deps.storage, contract_id)?;
 
     for u in updates.iter() {
       match u.clone() {
-        IndexSlotValue::Number { slot, value } => {
+        IndexSlotValue::Uint64 { slot, value } => {
           if slot >= SLOT_COUNT {
             return Err(ContractError::SlotOutOfBounds { slot });
           }
-          let old_val = ix_keys.number[slot as usize];
-          update_number_index(deps.storage, &env, slot, old_val, value, contract_id)?;
-          ix_keys.number[slot as usize] = Some(value);
+          let old_val = ix_keys.uint64[slot as usize];
+          update_u64_index(deps.storage, &env, slot, old_val, value, contract_id)?;
+          ix_keys.uint64[slot as usize] = Some(value);
         },
         IndexSlotValue::Text { slot, value } => {
           if slot >= SLOT_COUNT {
@@ -94,10 +95,18 @@ pub fn update(
           update_bool_index(deps.storage, &env, slot, old_val, &value, contract_id)?;
           ix_keys.timestamp[slot as usize] = Some(if value { 1 } else { 0 });
         },
+        IndexSlotValue::Uint128 { slot, value } => {
+          if slot >= SLOT_COUNT {
+            return Err(ContractError::SlotOutOfBounds { slot });
+          }
+          let old_val = ix_keys.uint128[slot as usize];
+          update_u128_index(deps.storage, &env, slot, old_val, value, contract_id)?;
+          ix_keys.uint128[slot as usize] = Some(value);
+        },
       }
     }
 
-    ID_2_IX_KEYS.save(deps.storage, contract_id, &ix_keys)?;
+    ID_2_INDEXED_VALUES.save(deps.storage, contract_id, &ix_keys)?;
   }
 
   Ok(Response::new().add_attributes(vec![attr("action", "update")]))
@@ -126,7 +135,7 @@ fn update_index_metadata<'a>(
   )?)
 }
 
-fn update_number_index(
+fn update_u64_index(
   storage: &mut dyn Storage,
   env: &Env,
   slot: Slot,
@@ -134,12 +143,12 @@ fn update_number_index(
   new_val: u64,
   id: ContractID,
 ) -> Result<u64, ContractError> {
-  let map = get_number_index(slot)?;
+  let map = get_u64_index(slot)?;
 
   if let Some(old_val) = some_old_val {
     map.remove(storage, (old_val.clone(), id));
   } else {
-    increment_index_size(storage, &NUMBER_INDEX_METADATA, slot)?;
+    increment_index_size(storage, &UINT64_INDEX_METADATA, slot)?;
   }
 
   map.save(storage, (new_val.clone(), id), &true)?;
@@ -147,10 +156,40 @@ fn update_number_index(
   update_index_metadata(
     storage,
     env,
-    &NUMBER_INDEX_METADATA,
+    &UINT64_INDEX_METADATA,
     slot,
     id,
-    IndexPrefix::Number(new_val),
+    IndexPrefix::Uint64(new_val),
+  )?;
+
+  Ok(new_val)
+}
+
+fn update_u128_index(
+  storage: &mut dyn Storage,
+  env: &Env,
+  slot: Slot,
+  some_old_val: Option<u128>,
+  new_val: u128,
+  id: ContractID,
+) -> Result<u128, ContractError> {
+  let map = get_u128_index(slot)?;
+
+  if let Some(old_val) = some_old_val {
+    map.remove(storage, (old_val.clone(), id));
+  } else {
+    increment_index_size(storage, &UINT128_INDEX_METADATA, slot)?;
+  }
+
+  map.save(storage, (new_val.clone(), id), &true)?;
+
+  update_index_metadata(
+    storage,
+    env,
+    &UINT128_INDEX_METADATA,
+    slot,
+    id,
+    IndexPrefix::Uint128(new_val),
   )?;
 
   Ok(new_val)

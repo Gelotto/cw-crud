@@ -67,6 +67,7 @@ pub fn query(
 ) -> Result<Binary, ContractError> {
   let result = match msg {
     QueryMsg::Select { fields } => to_binary(&query::select(deps, fields)?),
+    QueryMsg::Values { contract_addr } => to_binary(&query::values(deps, &contract_addr)?),
     QueryMsg::Count {} => to_binary(&query::count(deps)?),
     QueryMsg::Read {
       index,

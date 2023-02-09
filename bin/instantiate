@@ -9,7 +9,7 @@ FILE_TX_HASH="tx_hash.txt"
 FILE_CONTRACT_ADDR="contract_addr.txt"
 FILE_CODE_ID="code_id.txt"
 CODE_ID=$(cat $RELEASE_DIR/$FILE_CODE_ID)
-INSTANTIATE_MSG='{"default_label":"test","code_ids":['$ALLOWED_CODE_ID'],"indices":[{"number":{"slot":0,"name":"counter"}},{"text":{"slot":1,"name":"lucky_message"}}]}'
+INSTANTIATE_MSG='{"default_label":"test","code_ids":['$ALLOWED_CODE_ID'],"indices":[{"uint128":{"slot":0,"name":"pool_size"}},{"text":{"slot":0,"name":"status"}},{"text":{"slot":1,"name":"tag"}}]}'
 
 set -e
 
@@ -25,7 +25,7 @@ case $NETWORK in
     CHAIN_ID=uni-3
     ;;
   mainnet)
-    NODE="https://rpc-juno.itastakers.com"
+    NODE="https://rpc-juno.itastakers.com:443"
     DENOM=ujuno
     CHAIN_ID=juno-1
     ;;
@@ -34,7 +34,7 @@ esac
 TXFLAG="--node $NODE --chain-id $CHAIN_ID --gas-prices 0.03$DENOM --gas auto --gas-adjustment 1.5 --admin $SENDER"
 
 instantiate() { 
-    CMD="junod tx wasm instantiate $CODE_ID $INSTANTIATE_MSG --label "$LABEL" --from $SENDER --output json -y $TXFLAG"
+    CMD="junod tx wasm instantiate $CODE_ID $INSTANTIATE_MSG --label '$LABEL' --from $SENDER --output json -y $TXFLAG"
     echo "$CMD"
 
     RESULT=$($CMD)

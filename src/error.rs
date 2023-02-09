@@ -23,6 +23,9 @@ pub enum ContractError {
   #[error("CodeIdNotAllowed")]
   CodeIdNotAllowed {},
 
+  #[error("NotFound")]
+  NotFound {},
+
   #[error("AclAlreadyEnabled")]
   AclAlreadyEnabled {},
 

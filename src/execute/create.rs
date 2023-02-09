@@ -1,11 +1,11 @@
 use crate::{
   error::ContractError,
-  models::{IndexKeys, IndexSlotValue, SLOT_COUNT},
+  models::{IndexSlotValue, IndexedValues, SLOT_COUNT},
   state::{
-    get_bool_index, get_next_contract_id, get_number_index, get_text_index, get_timestamp_index,
-    increment_index_size, is_allowed, ALLOWED_CODE_IDS, BOOL_INDEX_METADATA, DEFAULT_CODE_ID,
-    DEFAULT_LABEL, ID_2_IX_KEYS, IX_CREATED_BY, NUMBER_INDEX_METADATA, TEXT_INDEX_METADATA,
-    TS_INDEX_METADATA,
+    get_bool_index, get_next_contract_id, get_text_index, get_timestamp_index, get_u128_index,
+    get_u64_index, increment_index_size, is_allowed, ALLOWED_CODE_IDS, BOOL_INDEX_METADATA,
+    DEFAULT_CODE_ID, DEFAULT_LABEL, ID_2_INDEXED_VALUES, IX_CREATED_BY, TEXT_INDEX_METADATA,
+    TS_INDEX_METADATA, UINT128_INDEX_METADATA, UINT64_INDEX_METADATA,
   },
 };
 use cosmwasm_std::{
@@ -48,19 +48,19 @@ pub fn create(
   // we use "keys" to keep track of which custom index keys are associated
   // with the new contract ID because we'll need this for the sake up updating
   // and removing contracts from the repo.
-  let mut keys = IndexKeys::new();
+  let mut keys = IndexedValues::new();
 
   // initialize custom indices
   if let Some(indices) = indices {
     for params in indices.iter() {
       match params.clone() {
-        IndexSlotValue::Number { slot, value } => {
+        IndexSlotValue::Uint64 { slot, value } => {
           if slot >= SLOT_COUNT {
             return Err(ContractError::SlotOutOfBounds { slot });
           }
-          increment_index_size(deps.storage, &NUMBER_INDEX_METADATA, slot)?;
-          get_number_index(slot)?.save(deps.storage, (value, contract_id), &true)?;
-          keys.number[slot as usize] = Some(value);
+          increment_index_size(deps.storage, &UINT64_INDEX_METADATA, slot)?;
+          get_u64_index(slot)?.save(deps.storage, (value, contract_id), &true)?;
+          keys.uint64[slot as usize] = Some(value);
         },
         IndexSlotValue::Timestamp { slot, value } => {
           if slot >= SLOT_COUNT {
@@ -87,11 +87,19 @@ pub fn create(
           get_bool_index(slot)?.save(deps.storage, (u8_bool, contract_id), &true)?;
           keys.boolean[slot as usize] = Some(u8_bool);
         },
+        IndexSlotValue::Uint128 { slot, value } => {
+          if slot >= SLOT_COUNT {
+            return Err(ContractError::SlotOutOfBounds { slot });
+          }
+          increment_index_size(deps.storage, &UINT128_INDEX_METADATA, slot)?;
+          get_u128_index(slot)?.save(deps.storage, (value, contract_id), &true)?;
+          keys.uint128[slot as usize] = Some(value);
+        },
       }
     }
   }
 
-  ID_2_IX_KEYS.save(deps.storage, contract_id, &keys)?;
+  ID_2_INDEXED_VALUES.save(deps.storage, contract_id, &keys)?;
 
   // create instantiation submsg. The instantiated contract should store the
   // sender address (of this repository contract) for it to use when calling update or

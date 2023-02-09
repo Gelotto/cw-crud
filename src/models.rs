@@ -49,7 +49,8 @@ pub struct KeyValue {
 
 #[cw_serde]
 pub enum IndexPrefix {
-  Number(u64),
+  Uint64(u64),
+  Uint128(u128),
   Text(String),
   Timestamp(u64),
   Boolean(u8),
@@ -57,7 +58,8 @@ pub enum IndexPrefix {
 
 #[cw_serde]
 pub enum IndexSlotValue {
-  Number { slot: Slot, value: u64 },
+  Uint64 { slot: Slot, value: u64 },
+  Uint128 { slot: Slot, value: u128 },
   Timestamp { slot: Slot, value: Timestamp },
   Text { slot: Slot, value: String },
   Boolean { slot: Slot, value: bool },
@@ -65,32 +67,37 @@ pub enum IndexSlotValue {
 
 #[cw_serde]
 pub enum IndexSlotName {
-  Number { slot: Slot, name: Option<String> },
+  Uint64 { slot: Slot, name: Option<String> },
+  Uint128 { slot: Slot, name: Option<String> },
   Timestamp { slot: Slot, name: Option<String> },
   Text { slot: Slot, name: Option<String> },
   Boolean { slot: Slot, name: Option<String> },
 }
 
 #[cw_serde]
-pub struct IndexKeys {
-  pub number: Vec<Option<u64>>,
+pub struct IndexedValues {
+  pub uint64: Vec<Option<u64>>,
+  pub uint128: Vec<Option<u128>>,
   pub text: Vec<Option<String>>,
   pub timestamp: Vec<Option<u64>>,
   pub boolean: Vec<Option<u8>>,
 }
 
-impl IndexKeys {
+impl IndexedValues {
   pub fn new() -> Self {
-    let mut number: Vec<Option<u64>> = Vec::with_capacity(SLOT_COUNT as usize);
+    let mut uint64: Vec<Option<u64>> = Vec::with_capacity(SLOT_COUNT as usize);
+    let mut uint128: Vec<Option<u128>> = Vec::with_capacity(SLOT_COUNT as usize);
     let mut text: Vec<Option<String>> = Vec::with_capacity(SLOT_COUNT as usize);
     let mut timestamp: Vec<Option<u64>> = Vec::with_capacity(SLOT_COUNT as usize);
     let mut boolean: Vec<Option<u8>> = Vec::with_capacity(SLOT_COUNT as usize);
-    number.resize_with(SLOT_COUNT as usize, Option::default);
+    uint64.resize_with(SLOT_COUNT as usize, Option::default);
+    uint128.resize_with(SLOT_COUNT as usize, Option::default);
     text.resize_with(SLOT_COUNT as usize, Option::default);
     timestamp.resize_with(SLOT_COUNT as usize, Option::default);
     boolean.resize_with(SLOT_COUNT as usize, Option::default);
     Self {
-      number,
+      uint64,
+      uint128,
       text,
       timestamp,
       boolean,
@@ -100,10 +107,15 @@ impl IndexKeys {
 
 #[cw_serde]
 pub enum IndexSlotNameValue {
-  Number {
+  Uint64 {
     slot: Slot,
     name: Option<String>,
     value: Option<u64>,
+  },
+  Uint128 {
+    slot: Slot,
+    name: Option<String>,
+    value: Option<u128>,
   },
   Timestamp {
     slot: Slot,
@@ -152,10 +164,15 @@ pub enum IndexBounds {
     between: Option<(Option<u64>, Option<u64>)>,
     equals: Option<u64>,
   },
-  Number {
+  Uint64 {
     slot: u8,
     between: Option<(Option<u64>, Option<u64>)>,
     equals: Option<u64>,
+  },
+  Uint128 {
+    slot: u8,
+    between: Option<(Option<u128>, Option<u128>)>,
+    equals: Option<u128>,
   },
   Timestamp {
     slot: u8,
@@ -176,7 +193,8 @@ pub enum IndexBounds {
 
 #[cw_serde]
 pub struct IndexMetadataView {
-  pub number: Vec<IndexMetadata>,
+  pub uint64: Vec<IndexMetadata>,
+  pub uint128: Vec<IndexMetadata>,
   pub text: Vec<IndexMetadata>,
   pub timestamp: Vec<IndexMetadata>,
   pub boolean: Vec<IndexMetadata>,

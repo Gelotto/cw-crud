@@ -8,7 +8,8 @@ use crate::{
   msg::SelectResponse,
   state::{
     ACL_CONTRACT_ADDR, ALLOWED_CODE_IDS, BOOL_INDEX_METADATA, COUNT, CREATED_BY, DEFAULT_CODE_ID,
-    DEFAULT_LABEL, NUMBER_INDEX_METADATA, TEXT_INDEX_METADATA, TS_INDEX_METADATA,
+    DEFAULT_LABEL, TEXT_INDEX_METADATA, TS_INDEX_METADATA, UINT128_INDEX_METADATA,
+    UINT64_INDEX_METADATA,
   },
 };
 
@@ -33,7 +34,8 @@ pub fn select(
     })?,
     indices: loader.view("indices", || {
       Ok(Some(IndexMetadataView {
-        number: load_map_values(deps.storage, &NUMBER_INDEX_METADATA)?,
+        uint64: load_map_values(deps.storage, &UINT64_INDEX_METADATA)?,
+        uint128: load_map_values(deps.storage, &UINT128_INDEX_METADATA)?,
         text: load_map_values(deps.storage, &TEXT_INDEX_METADATA)?,
         boolean: load_map_values(deps.storage, &BOOL_INDEX_METADATA)?,
         timestamp: load_map_values(deps.storage, &TS_INDEX_METADATA)?,

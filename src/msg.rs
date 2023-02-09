@@ -3,6 +3,7 @@ use cosmwasm_std::{Addr, Binary, Timestamp};
 
 use crate::models::{
   ContractID, ContractMetadata, IndexBounds, IndexMetadataView, IndexSlotName, IndexSlotValue,
+  IndexedValues,
 };
 
 #[cw_serde]
@@ -43,6 +44,9 @@ pub enum QueryMsg {
   Select {
     fields: Option<Vec<String>>,
   },
+  Values {
+    contract_addr: Addr,
+  },
   Read {
     index: IndexBounds,
     fields: Option<Vec<String>>,
@@ -63,6 +67,11 @@ pub enum Since {
 #[cw_serde]
 pub struct CountResponse {
   pub count: u64,
+}
+
+#[cw_serde]
+pub struct ValuesResponse {
+  pub values: IndexedValues,
 }
 
 #[cw_serde]

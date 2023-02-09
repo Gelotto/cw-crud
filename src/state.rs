@@ -1,13 +1,12 @@
-use crate::models::{ContractMetadata, IndexKeys, IndexMetadata, IndexSlotName, Slot};
+use crate::models::{ContractMetadata, IndexMetadata, IndexSlotName, IndexedValues, Slot};
 use crate::msg::InstantiateMsg;
 use crate::{error::ContractError, models::ContractID};
-use cosmwasm_std::{
-  Addr, DepsMut, Empty, Env, MessageInfo, QuerierWrapper, Response, StdResult, Storage,
-};
+use cosmwasm_std::{Addr, DepsMut, Empty, Env, MessageInfo, QuerierWrapper, Response, Storage};
 use cw_acl::client::Acl;
 use cw_storage_plus::{Item, Map};
 
-pub type NumberIndexMap<'a> = Map<'a, (u64, ContractID), bool>;
+pub type Uint64IndexMap<'a> = Map<'a, (u64, ContractID), bool>;
+pub type Uint128IndexMap<'a> = Map<'a, (u128, ContractID), bool>;
 pub type TextIndexMap<'a> = Map<'a, (String, ContractID), bool>;
 pub type AddrIndexMap<'a> = Map<'a, (Addr, ContractID), bool>;
 pub type BoolIndexMap<'a> = Map<'a, (u8, ContractID), bool>;
@@ -38,38 +37,44 @@ pub const ADDR_2_ID: Map<Addr, ContractID> = Map::new("addr_2_id");
 
 /// Lookup table from contract ID to vecs of optional values to use as
 /// prefixes when looking up the entry in a custom index below
-pub const ID_2_IX_KEYS: Map<ContractID, IndexKeys> = Map::new("id_2_ix_keys");
+pub const ID_2_INDEXED_VALUES: Map<ContractID, IndexedValues> = Map::new("id_2_indexed_values");
 
 /// Metadata stored for each contract in this repo
 pub const METADATA: Map<Addr, ContractMetadata> = Map::new("contract_metadata");
 
 /// Metadata storage for each custom index
-pub const NUMBER_INDEX_METADATA: Map<Slot, IndexMetadata> = Map::new("number_index_metadata");
+pub const UINT64_INDEX_METADATA: Map<Slot, IndexMetadata> = Map::new("u64_index_metadata");
+pub const UINT128_INDEX_METADATA: Map<Slot, IndexMetadata> = Map::new("u128_index_metadata");
 pub const TEXT_INDEX_METADATA: Map<Slot, IndexMetadata> = Map::new("text_index_metadata");
 pub const BOOL_INDEX_METADATA: Map<Slot, IndexMetadata> = Map::new("bool_index_metadata");
 pub const TS_INDEX_METADATA: Map<Slot, IndexMetadata> = Map::new("ts_index_metadata");
 
 /// Built-in indices
 pub const IX_CREATED_BY: AddrIndexMap = Map::new("ix_created_by");
-pub const IX_CREATED_AT: NumberIndexMap = Map::new("ix_created_at");
-pub const IX_UPDATED_AT: NumberIndexMap = Map::new("ix_updated_at");
-pub const IX_CODE_ID: NumberIndexMap = Map::new("ix_code_id");
-pub const IX_HEIGHT: NumberIndexMap = Map::new("ix_height");
-pub const IX_REV: NumberIndexMap = Map::new("ix_rev");
+pub const IX_CREATED_AT: Uint64IndexMap = Map::new("ix_created_at");
+pub const IX_UPDATED_AT: Uint64IndexMap = Map::new("ix_updated_at");
+pub const IX_CODE_ID: Uint64IndexMap = Map::new("ix_code_id");
+pub const IX_HEIGHT: Uint64IndexMap = Map::new("ix_height");
+pub const IX_REV: Uint64IndexMap = Map::new("ix_rev");
 
 /// Custom index slots
-// TODO: add seperate maps for None values
-pub const IX_NUMBER_0: NumberIndexMap = Map::new("ix_number_0");
-pub const IX_NUMBER_1: NumberIndexMap = Map::new("ix_number_1");
-pub const IX_NUMBER_2: NumberIndexMap = Map::new("ix_number_2");
-pub const IX_NUMBER_3: NumberIndexMap = Map::new("ix_number_3");
-pub const IX_NUMBER_4: NumberIndexMap = Map::new("ix_number_4");
+pub const IX_U64_0: Uint64IndexMap = Map::new("ix_u64_0");
+pub const IX_U64_1: Uint64IndexMap = Map::new("ix_u64_1");
+pub const IX_U64_2: Uint64IndexMap = Map::new("ix_u64_2");
+pub const IX_U64_3: Uint64IndexMap = Map::new("ix_u64_3");
+pub const IX_U64_4: Uint64IndexMap = Map::new("ix_u64_4");
 
-pub const IX_TS_0: NumberIndexMap = Map::new("ix_ts_u64_0");
-pub const IX_TS_1: NumberIndexMap = Map::new("ix_ts_u64_1");
-pub const IX_TS_2: NumberIndexMap = Map::new("ix_ts_u64_2");
-pub const IX_TS_3: NumberIndexMap = Map::new("ix_ts_u64_3");
-pub const IX_TS_4: NumberIndexMap = Map::new("ix_ts_u64_4");
+pub const IX_U128_0: Uint128IndexMap = Map::new("ix_u128_0");
+pub const IX_U128_1: Uint128IndexMap = Map::new("ix_u128_1");
+pub const IX_U128_2: Uint128IndexMap = Map::new("ix_u128_2");
+pub const IX_U128_3: Uint128IndexMap = Map::new("ix_u128_3");
+pub const IX_U128_4: Uint128IndexMap = Map::new("ix_u128_4");
+
+pub const IX_TS_0: Uint64IndexMap = Map::new("ix_ts_u64_0");
+pub const IX_TS_1: Uint64IndexMap = Map::new("ix_ts_u64_1");
+pub const IX_TS_2: Uint64IndexMap = Map::new("ix_ts_u64_2");
+pub const IX_TS_3: Uint64IndexMap = Map::new("ix_ts_u64_3");
+pub const IX_TS_4: Uint64IndexMap = Map::new("ix_ts_u64_4");
 
 pub const IX_BOOL_0: BoolIndexMap = Map::new("ix_bool_0");
 pub const IX_BOOL_1: BoolIndexMap = Map::new("ix_bool_1");
@@ -123,8 +128,11 @@ pub fn initialize(
   if let Some(indices) = &msg.indices {
     for x in indices.iter() {
       match x {
-        IndexSlotName::Number { slot, name } => {
-          NUMBER_INDEX_METADATA.save(deps.storage, *slot, &IndexMetadata::new(*slot, name))?
+        IndexSlotName::Uint64 { slot, name } => {
+          UINT64_INDEX_METADATA.save(deps.storage, *slot, &IndexMetadata::new(*slot, name))?
+        },
+        IndexSlotName::Uint128 { slot, name } => {
+          UINT128_INDEX_METADATA.save(deps.storage, *slot, &IndexMetadata::new(*slot, name))?
         },
         IndexSlotName::Timestamp { slot, name } => {
           TS_INDEX_METADATA.save(deps.storage, *slot, &IndexMetadata::new(*slot, name))?
@@ -175,22 +183,37 @@ pub fn owns_contract(
 pub fn get_contract_id(
   storage: &dyn Storage,
   contract_addr: &Addr,
-) -> StdResult<ContractID> {
-  ADDR_2_ID.load(storage, contract_addr.clone())
+) -> Result<ContractID, ContractError> {
+  if let Some(id) = ADDR_2_ID.may_load(storage, contract_addr.clone())? {
+    Ok(id)
+  } else {
+    Err(ContractError::NotFound {})
+  }
 }
 
-pub fn get_number_index(slot: u8) -> Result<NumberIndexMap<'static>, ContractError> {
+pub fn get_u64_index(slot: u8) -> Result<Uint64IndexMap<'static>, ContractError> {
   match slot {
-    0 => Ok(IX_NUMBER_0),
-    1 => Ok(IX_NUMBER_1),
-    2 => Ok(IX_NUMBER_2),
-    3 => Ok(IX_NUMBER_3),
-    4 => Ok(IX_NUMBER_4),
+    0 => Ok(IX_U64_0),
+    1 => Ok(IX_U64_1),
+    2 => Ok(IX_U64_2),
+    3 => Ok(IX_U64_3),
+    4 => Ok(IX_U64_4),
     _ => Err(ContractError::NotAuthorized {}),
   }
 }
 
-pub fn get_timestamp_index(slot: u8) -> Result<NumberIndexMap<'static>, ContractError> {
+pub fn get_u128_index(slot: u8) -> Result<Uint128IndexMap<'static>, ContractError> {
+  match slot {
+    0 => Ok(IX_U128_0),
+    1 => Ok(IX_U128_1),
+    2 => Ok(IX_U128_2),
+    3 => Ok(IX_U128_3),
+    4 => Ok(IX_U128_4),
+    _ => Err(ContractError::NotAuthorized {}),
+  }
+}
+
+pub fn get_timestamp_index(slot: u8) -> Result<Uint64IndexMap<'static>, ContractError> {
   match slot {
     0 => Ok(IX_TS_0),
     1 => Ok(IX_TS_1),

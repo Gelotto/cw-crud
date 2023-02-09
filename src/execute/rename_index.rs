@@ -2,7 +2,8 @@ use crate::{
   error::ContractError,
   models::{IndexMetadata, IndexSlotName, Slot, SLOT_COUNT},
   state::{
-    is_allowed, BOOL_INDEX_METADATA, NUMBER_INDEX_METADATA, TEXT_INDEX_METADATA, TS_INDEX_METADATA,
+    is_allowed, BOOL_INDEX_METADATA, TEXT_INDEX_METADATA, TS_INDEX_METADATA,
+    UINT128_INDEX_METADATA, UINT64_INDEX_METADATA,
   },
 };
 use cosmwasm_std::{attr, DepsMut, Env, MessageInfo, Response, StdError, Storage};
@@ -19,13 +20,13 @@ pub fn rename_index(
   }
 
   let (slot, (old_name, new_name)) = match name {
-    IndexSlotName::Number { slot, name } => {
+    IndexSlotName::Uint64 { slot, name } => {
       if slot >= SLOT_COUNT {
         return Err(ContractError::SlotOutOfBounds { slot });
       }
       (
         slot,
-        update_index_name(deps.storage, &NUMBER_INDEX_METADATA, slot, &name)?,
+        update_index_name(deps.storage, &UINT64_INDEX_METADATA, slot, &name)?,
       )
     },
     IndexSlotName::Timestamp { slot, name } => {
@@ -53,6 +54,15 @@ pub fn rename_index(
       (
         slot,
         update_index_name(deps.storage, &BOOL_INDEX_METADATA, slot, &name)?,
+      )
+    },
+    IndexSlotName::Uint128 { slot, name } => {
+      if slot >= SLOT_COUNT {
+        return Err(ContractError::SlotOutOfBounds { slot });
+      }
+      (
+        slot,
+        update_index_name(deps.storage, &UINT128_INDEX_METADATA, slot, &name)?,
       )
     },
   };
