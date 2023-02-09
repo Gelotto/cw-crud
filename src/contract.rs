@@ -56,6 +56,9 @@ pub fn execute(
     ExecuteMsg::SetAcl { acl_contract_addr } => {
       execute::set_acl(deps, env, info, &acl_contract_addr)
     },
+    ExecuteMsg::UpdateAllowedCodeIdes { code_ids } => {
+      execute::update_allowed_code_ids(deps, env, info, code_ids)
+    },
   }
 }
 

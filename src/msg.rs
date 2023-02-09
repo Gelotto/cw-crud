@@ -36,6 +36,9 @@ pub enum ExecuteMsg {
   SetAcl {
     acl_contract_addr: Addr,
   },
+  UpdateAllowedCodeIdes {
+    code_ids: Vec<u64>,
+  },
 }
 
 #[cw_serde]

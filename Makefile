@@ -14,6 +14,9 @@ build:
 deploy:
 	./bin/deploy ./artifacts/$(wasm_filename) $(network) $(sender)
 
+deploy-mainnet:
+	./bin/deploy ./artifacts/$(wasm_filename) mainnet juno12jpu0gqxtslzy3lsw3xm86euqn83mdas6mflme
+
 # instantiate last contract to be deployed using code ID in release dir code-id file
 instantiate:
 	./bin/instantiate $(network) $(sender) $(acl_contract_addr) $(allowed_code_id)
