@@ -148,7 +148,6 @@ pub fn create(
         attr("code_id", code_id.to_string()),
         attr("admin", computed_admin.clone().unwrap()),
         attr("label", computed_label.clone()),
-        attr("preset", maybe_preset_name.unwrap_or("".to_owned()).clone()),
       ])
       .add_submessage(SubMsg::reply_always(wasm_instantiate_msg, contract_id)),
   )
