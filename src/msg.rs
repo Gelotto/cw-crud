@@ -71,6 +71,7 @@ pub enum QueryMsg {
     desc: Option<bool>,
     cursor: Option<(String, ContractID)>,
     meta: Option<bool>,
+    wallet: Option<Addr>,
   },
 }
 
@@ -110,7 +111,10 @@ pub struct ReadResponse {
 
 #[cw_serde]
 pub enum ImplementorQueryMsg {
-  Select { fields: Option<Vec<String>> },
+  Select {
+    wallet: Option<Addr>,
+    fields: Option<Vec<String>>,
+  },
 }
 
 #[cw_serde]

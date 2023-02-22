@@ -105,8 +105,9 @@ pub fn query(
       fields,
       since,
       meta,
+      wallet,
     } => to_binary(&query::read(
-      deps, &index, desc, limit, fields, since, meta, cursor,
+      deps, &index, desc, limit, fields, since, meta, wallet, cursor,
     )?),
   }?;
   Ok(result)

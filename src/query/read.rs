@@ -29,6 +29,7 @@ pub fn read(
   fields: Option<Vec<String>>,
   since: Option<Since>,
   meta: Option<bool>,
+  wallet: Option<Addr>,
   cursor: Option<(String, ContractID)>,
 ) -> Result<ReadResponse, ContractError> {
   // clamp limit to min and max bounds
@@ -155,6 +156,7 @@ pub fn read(
         deps.querier,
         &contract_addr,
         &fields,
+        &wallet,
       )?)
     } else {
       None
@@ -179,10 +181,12 @@ fn query_smart_no_deserialize(
   querier: QuerierWrapper<Empty>,
   contract_addr: &Addr,
   fields: &Option<Vec<String>>,
+  wallet: &Option<Addr>,
 ) -> Result<Binary, ContractError> {
   let request: QueryRequest<Empty> = WasmQuery::Smart {
     contract_addr: contract_addr.clone().into(),
     msg: to_binary(&ImplementorQueryMsg::Select {
+      wallet: wallet.clone(),
       fields: fields.clone(),
     })?,
   }
