@@ -7,9 +7,8 @@ use crate::{
   models::{IndexMetadata, IndexMetadataView, Slot},
   msg::SelectResponse,
   state::{
-    ACL_CONTRACT_ADDR, ALLOWED_CODE_IDS, BOOL_INDEX_METADATA, COUNT, CREATED_BY, DEFAULT_CODE_ID,
-    DEFAULT_LABEL, TEXT_INDEX_METADATA, TS_INDEX_METADATA, UINT128_INDEX_METADATA,
-    UINT64_INDEX_METADATA,
+    ACL_CONTRACT_ADDR, ALLOWED_CODE_IDS, COUNT, CREATED_BY, DEFAULT_CODE_ID, DEFAULT_LABEL,
+    IX_META_BOOL, IX_META_STRING, IX_META_TIMESTAMP, IX_META_U128, IX_META_U64,
   },
 };
 
@@ -34,17 +33,17 @@ pub fn select(
     })?,
     indices: loader.view("indices", || {
       Ok(Some(IndexMetadataView {
-        uint64: load_map_values(deps.storage, &UINT64_INDEX_METADATA)?,
-        uint128: load_map_values(deps.storage, &UINT128_INDEX_METADATA)?,
-        text: load_map_values(deps.storage, &TEXT_INDEX_METADATA)?,
-        boolean: load_map_values(deps.storage, &BOOL_INDEX_METADATA)?,
-        timestamp: load_map_values(deps.storage, &TS_INDEX_METADATA)?,
+        uint64: collect_values(deps.storage, &IX_META_U64)?,
+        uint128: collect_values(deps.storage, &IX_META_U128)?,
+        text: collect_values(deps.storage, &IX_META_STRING)?,
+        boolean: collect_values(deps.storage, &IX_META_BOOL)?,
+        timestamp: collect_values(deps.storage, &IX_META_TIMESTAMP)?,
       }))
     })?,
   })
 }
 
-fn load_map_values<'a>(
+fn collect_values<'a>(
   storage: &dyn Storage,
   map: &Map<'a, Slot, IndexMetadata>,
 ) -> StdResult<Vec<IndexMetadata>> {

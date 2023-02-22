@@ -3,9 +3,8 @@ use crate::{
   models::{ContractID, IndexMetadata, IndexPrefix, IndexSlotValue, Slot, SLOT_COUNT},
   state::{
     get_bool_index, get_contract_id, get_text_index, get_timestamp_index, get_u128_index,
-    get_u64_index, increment_index_size, BOOL_INDEX_METADATA, ID_2_INDEXED_VALUES, IX_REV,
-    METADATA, TEXT_INDEX_METADATA, TS_INDEX_METADATA, UINT128_INDEX_METADATA,
-    UINT64_INDEX_METADATA,
+    get_u64_index, increment_index_size, ID_2_INDEXED_VALUES, IX_META_BOOL, IX_META_STRING,
+    IX_META_TIMESTAMP, IX_META_U128, IX_META_U64, IX_REV, METADATA,
   },
   state::{owns_contract, IX_UPDATED_AT},
 };
@@ -148,7 +147,7 @@ fn update_u64_index(
   if let Some(old_val) = some_old_val {
     map.remove(storage, (old_val.clone(), id));
   } else {
-    increment_index_size(storage, &UINT64_INDEX_METADATA, slot)?;
+    increment_index_size(storage, &IX_META_U64, slot)?;
   }
 
   map.save(storage, (new_val.clone(), id), &true)?;
@@ -156,7 +155,7 @@ fn update_u64_index(
   update_index_metadata(
     storage,
     env,
-    &UINT64_INDEX_METADATA,
+    &IX_META_U64,
     slot,
     id,
     IndexPrefix::Uint64(new_val),
@@ -178,7 +177,7 @@ fn update_u128_index(
   if let Some(old_val) = some_old_val {
     map.remove(storage, (old_val.clone(), id));
   } else {
-    increment_index_size(storage, &UINT128_INDEX_METADATA, slot)?;
+    increment_index_size(storage, &IX_META_U128, slot)?;
   }
 
   map.save(storage, (new_val.clone(), id), &true)?;
@@ -186,7 +185,7 @@ fn update_u128_index(
   update_index_metadata(
     storage,
     env,
-    &UINT128_INDEX_METADATA,
+    &IX_META_U128,
     slot,
     id,
     IndexPrefix::Uint128(new_val),
@@ -208,7 +207,7 @@ fn update_text_index(
   if let Some(old_val) = some_old_val {
     map.remove(storage, (old_val.clone(), id));
   } else {
-    increment_index_size(storage, &TEXT_INDEX_METADATA, slot)?;
+    increment_index_size(storage, &IX_META_STRING, slot)?;
   }
 
   map.save(storage, (new_val.clone(), id), &true)?;
@@ -216,7 +215,7 @@ fn update_text_index(
   update_index_metadata(
     storage,
     env,
-    &TEXT_INDEX_METADATA,
+    &IX_META_STRING,
     slot,
     id,
     IndexPrefix::Text(new_val.clone()),
@@ -238,7 +237,7 @@ fn update_timestamp_index(
   if let Some(old_val) = some_old_val {
     map.remove(storage, (old_val, id));
   } else {
-    increment_index_size(storage, &TS_INDEX_METADATA, slot)?;
+    increment_index_size(storage, &IX_META_TIMESTAMP, slot)?;
   }
 
   map.save(storage, (new_val.nanos(), id), &true)?;
@@ -246,7 +245,7 @@ fn update_timestamp_index(
   update_index_metadata(
     storage,
     env,
-    &TS_INDEX_METADATA,
+    &IX_META_TIMESTAMP,
     slot,
     id,
     IndexPrefix::Timestamp(new_val.nanos()),
@@ -267,7 +266,7 @@ fn update_bool_index(
   if let Some(old_val) = some_old_val {
     map.remove(storage, (old_val, id));
   } else {
-    increment_index_size(storage, &TEXT_INDEX_METADATA, slot)?;
+    increment_index_size(storage, &IX_META_STRING, slot)?;
   }
 
   let new_u8_bool = if *new_val { 1 } else { 0 };
@@ -276,7 +275,7 @@ fn update_bool_index(
   update_index_metadata(
     storage,
     env,
-    &BOOL_INDEX_METADATA,
+    &IX_META_BOOL,
     slot,
     id,
     IndexPrefix::Boolean(new_u8_bool),

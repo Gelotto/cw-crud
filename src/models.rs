@@ -1,5 +1,5 @@
 use cosmwasm_schema::cw_serde;
-use cosmwasm_std::{Addr, Timestamp};
+use cosmwasm_std::{Addr, Binary, Timestamp};
 
 pub const SLOT_COUNT: u8 = 5;
 
@@ -39,6 +39,15 @@ impl IndexMetadata {
       slot,
     }
   }
+}
+
+#[cw_serde]
+pub struct InstantiationPreset {
+  pub code_id: Option<u64>,
+  pub msg: Binary,
+  pub admin: Option<Addr>,
+  pub indices: Option<Vec<IndexSlotValue>>,
+  pub label: Option<String>,
 }
 
 #[cw_serde]

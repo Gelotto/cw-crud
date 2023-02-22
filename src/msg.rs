@@ -23,6 +23,19 @@ pub enum ExecuteMsg {
     admin: Option<Addr>,
     label: Option<String>,
     indices: Option<Vec<IndexSlotValue>>,
+    preset: Option<String>,
+  },
+  CreateFromPreset {
+    owner: Addr,
+    preset: String,
+    code_id: Option<u64>,
+    msg: Option<Binary>,
+    admin: Option<Addr>,
+    label: Option<String>,
+    indices: Option<Vec<IndexSlotValue>>,
+  },
+  RemovePreset {
+    preset: String,
   },
   Update {
     values: Option<Vec<IndexSlotValue>>,

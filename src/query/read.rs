@@ -250,7 +250,10 @@ fn paginate_metadata(
     })
     .or(None);
 
-  let iter = map.range(store, start_bound, stop_bound, order);
+  let iter = match order {
+    Order::Ascending => map.range(store, start_bound, stop_bound, order),
+    Order::Descending => map.range(store, stop_bound, start_bound, order),
+  };
 
   return collect(
     iter,
@@ -305,24 +308,24 @@ fn paginate_addr_index<'a>(
   };
 
   let iter = if let Some((x, id)) = cursor {
-    map.range(
-      store,
-      if let Ok(addr) = api.addr_validate(x.as_str()) {
-        Some(Bound::Exclusive(((addr, id), PhantomData)))
-      } else {
-        None
-      },
-      stop
-        .and_then(|addr| {
-          Some(if is_exclusive {
-            Bound::Exclusive(((addr, 0), PhantomData))
-          } else {
-            Bound::Inclusive(((addr, 0), PhantomData))
-          })
+    let start = if let Ok(addr) = api.addr_validate(x.as_str()) {
+      Some(Bound::Exclusive(((addr, id), PhantomData)))
+    } else {
+      None
+    };
+    let stop = stop
+      .and_then(|addr| {
+        Some(if is_exclusive {
+          Bound::Exclusive(((addr, 0), PhantomData))
+        } else {
+          Bound::Inclusive(((addr, 0), PhantomData))
         })
-        .or(None),
-      order,
-    )
+      })
+      .or(None);
+    match order {
+      Order::Ascending => map.range(store, start, stop, order),
+      Order::Descending => map.range(store, stop, start, order),
+    }
   } else {
     map.prefix_range(
       store,
@@ -367,23 +370,23 @@ fn paginate_u128_index<'a>(
   };
 
   let iter = if let Some((x, id)) = cursor {
-    map.range(
-      store,
-      match u128::from_str_radix(x.as_str(), 10) {
-        Ok(x) => Some(Bound::Exclusive(((x, id), PhantomData))),
-        Err(_) => None,
-      },
-      stop
-        .and_then(|x| {
-          Some(if is_exclusive {
-            Bound::Exclusive(((x, 0), PhantomData))
-          } else {
-            Bound::Inclusive(((x, ContractID::MAX), PhantomData))
-          })
+    let start = match x.parse::<u128>() {
+      Ok(x) => Some(Bound::Exclusive(((x, id), PhantomData))),
+      Err(_) => None,
+    };
+    let stop = stop
+      .and_then(|x| {
+        Some(if is_exclusive {
+          Bound::Exclusive(((x, 0), PhantomData))
+        } else {
+          Bound::Inclusive(((x, ContractID::MAX), PhantomData))
         })
-        .or(None),
-      order,
-    )
+      })
+      .or(None);
+    match order {
+      Order::Ascending => map.range(store, start, stop, order),
+      Order::Descending => map.range(store, stop, start, order),
+    }
   } else {
     map.prefix_range(
       store,
@@ -428,23 +431,23 @@ fn paginate_u64_index<'a>(
   };
 
   let iter = if let Some((x, id)) = cursor {
-    map.range(
-      store,
-      match u64::from_str_radix(x.as_str(), 10) {
-        Ok(x) => Some(Bound::Exclusive(((x, id), PhantomData))),
-        Err(_) => None,
-      },
-      stop
-        .and_then(|x| {
-          Some(if is_exclusive {
-            Bound::Exclusive(((x, 0), PhantomData))
-          } else {
-            Bound::Inclusive(((x, ContractID::MAX), PhantomData))
-          })
+    let start = match x.parse::<u64>() {
+      Ok(x) => Some(Bound::Exclusive(((x, id), PhantomData))),
+      Err(_) => None,
+    };
+    let stop = stop
+      .and_then(|x| {
+        Some(if is_exclusive {
+          Bound::Exclusive(((x, 0), PhantomData))
+        } else {
+          Bound::Inclusive(((x, ContractID::MAX), PhantomData))
         })
-        .or(None),
-      order,
-    )
+      })
+      .or(None);
+    match order {
+      Order::Ascending => map.range(store, start, stop, order),
+      Order::Descending => map.range(store, stop, start, order),
+    }
   } else {
     map.prefix_range(
       store,
@@ -486,14 +489,14 @@ fn paginate_bool_index<'a>(
     } else {
       0u8
     };
-    map.range(
-      store,
-      Some(Bound::Exclusive(((bool_binary, id), PhantomData))),
-      stop
-        .and_then(|x| Some(Bound::Exclusive(((if x { 1 } else { 0 }, 0), PhantomData))))
-        .or(None),
-      order,
-    )
+    let start = Some(Bound::Exclusive(((bool_binary, id), PhantomData)));
+    let stop = stop
+      .and_then(|x| Some(Bound::Exclusive(((if x { 1 } else { 0 }, 0), PhantomData))))
+      .or(None);
+    match order {
+      Order::Ascending => map.range(store, start, stop, order),
+      Order::Descending => map.range(store, stop, start, order),
+    }
   } else {
     map.prefix_range(
       store,
@@ -532,20 +535,20 @@ fn paginate_str_index<'a>(
   };
 
   let iter = if let Some(cur) = cursor {
-    map.range(
-      store,
-      Some(Bound::Exclusive((cur, PhantomData))),
-      stop
-        .and_then(|x| {
-          Some(if is_exclusive {
-            Bound::Exclusive(((x, 0), PhantomData))
-          } else {
-            Bound::Inclusive(((x, 0), PhantomData))
-          })
+    let start = Some(Bound::Exclusive((cur, PhantomData)));
+    let stop = stop
+      .and_then(|x| {
+        Some(if is_exclusive {
+          Bound::Exclusive(((x, 0), PhantomData))
+        } else {
+          Bound::Inclusive(((x, 0), PhantomData))
         })
-        .or(None),
-      order,
-    )
+      })
+      .or(None);
+    match order {
+      Order::Ascending => map.range(store, start, stop, order),
+      Order::Descending => map.range(store, stop, start, order),
+    }
   } else {
     map.prefix_range(
       store,
@@ -590,5 +593,3 @@ where
     })
     .collect()
 }
-
-// TODO:

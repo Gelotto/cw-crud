@@ -6,6 +6,7 @@ use crate::{
   state::{get_contract_id, ID_2_INDEXED_VALUES},
 };
 
+/// Get the keys in each index for a given contract or account address.
 pub fn values(
   deps: Deps,
   contract_addr: &Addr,

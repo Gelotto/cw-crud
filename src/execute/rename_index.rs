@@ -1,10 +1,7 @@
 use crate::{
   error::ContractError,
   models::{IndexMetadata, IndexSlotName, Slot, SLOT_COUNT},
-  state::{
-    is_allowed, BOOL_INDEX_METADATA, TEXT_INDEX_METADATA, TS_INDEX_METADATA,
-    UINT128_INDEX_METADATA, UINT64_INDEX_METADATA,
-  },
+  state::{is_allowed, IX_META_BOOL, IX_META_STRING, IX_META_TIMESTAMP, IX_META_U128, IX_META_U64},
 };
 use cosmwasm_std::{attr, DepsMut, Env, MessageInfo, Response, StdError, Storage};
 use cw_storage_plus::Map;
@@ -26,7 +23,7 @@ pub fn rename_index(
       }
       (
         slot,
-        update_index_name(deps.storage, &UINT64_INDEX_METADATA, slot, &name)?,
+        update_index_name(deps.storage, &IX_META_U64, slot, &name)?,
       )
     },
     IndexSlotName::Timestamp { slot, name } => {
@@ -35,7 +32,7 @@ pub fn rename_index(
       }
       (
         slot,
-        update_index_name(deps.storage, &TS_INDEX_METADATA, slot, &name)?,
+        update_index_name(deps.storage, &IX_META_TIMESTAMP, slot, &name)?,
       )
     },
     IndexSlotName::Text { slot, name } => {
@@ -44,7 +41,7 @@ pub fn rename_index(
       }
       (
         slot,
-        update_index_name(deps.storage, &TEXT_INDEX_METADATA, slot, &name)?,
+        update_index_name(deps.storage, &IX_META_STRING, slot, &name)?,
       )
     },
     IndexSlotName::Boolean { slot, name } => {
@@ -53,7 +50,7 @@ pub fn rename_index(
       }
       (
         slot,
-        update_index_name(deps.storage, &BOOL_INDEX_METADATA, slot, &name)?,
+        update_index_name(deps.storage, &IX_META_BOOL, slot, &name)?,
       )
     },
     IndexSlotName::Uint128 { slot, name } => {
@@ -62,7 +59,7 @@ pub fn rename_index(
       }
       (
         slot,
-        update_index_name(deps.storage, &UINT128_INDEX_METADATA, slot, &name)?,
+        update_index_name(deps.storage, &IX_META_U128, slot, &name)?,
       )
     },
   };

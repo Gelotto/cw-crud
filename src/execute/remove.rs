@@ -3,9 +3,9 @@ use crate::{
   models::Slot,
   state::{
     decrement_index_size, get_bool_index, get_contract_id, get_text_index, get_timestamp_index,
-    get_u64_index, is_allowed, ADDR_2_ID, BOOL_INDEX_METADATA, COUNT, ID_2_ADDR,
-    ID_2_INDEXED_VALUES, IX_CODE_ID, IX_CREATED_AT, IX_HEIGHT, IX_REV, IX_UPDATED_AT, METADATA,
-    TEXT_INDEX_METADATA, TS_INDEX_METADATA, UINT64_INDEX_METADATA,
+    get_u64_index, is_allowed, ADDR_2_ID, COUNT, ID_2_ADDR, ID_2_INDEXED_VALUES, IX_CODE_ID,
+    IX_CREATED_AT, IX_HEIGHT, IX_META_BOOL, IX_META_STRING, IX_META_TIMESTAMP, IX_META_U64, IX_REV,
+    IX_UPDATED_AT, METADATA,
   },
 };
 use cosmwasm_std::{attr, Addr, DepsMut, Env, MessageInfo, Response};
@@ -31,28 +31,28 @@ pub fn remove(
     if let Some(value) = some_value {
       let slot = i as Slot;
       get_u64_index(slot)?.remove(deps.storage, (*value, contract_id));
-      decrement_index_size(deps.storage, &UINT64_INDEX_METADATA, slot)?;
+      decrement_index_size(deps.storage, &IX_META_U64, slot)?;
     }
   }
   for (i, some_value) in prefixes.text.iter().enumerate() {
     if let Some(value) = some_value {
       let slot = i as Slot;
       get_text_index(slot)?.remove(deps.storage, (value.clone(), contract_id));
-      decrement_index_size(deps.storage, &TEXT_INDEX_METADATA, slot)?;
+      decrement_index_size(deps.storage, &IX_META_STRING, slot)?;
     }
   }
   for (i, some_value) in prefixes.timestamp.iter().enumerate() {
     if let Some(value) = some_value {
       let slot = i as Slot;
       get_timestamp_index(slot)?.remove(deps.storage, (*value, contract_id));
-      decrement_index_size(deps.storage, &TS_INDEX_METADATA, slot)?;
+      decrement_index_size(deps.storage, &IX_META_TIMESTAMP, slot)?;
     }
   }
   for (i, some_value) in prefixes.boolean.iter().enumerate() {
     if let Some(value) = some_value {
       let slot = i as Slot;
       get_bool_index(slot)?.remove(deps.storage, (*value, contract_id));
-      decrement_index_size(deps.storage, &BOOL_INDEX_METADATA, slot)?;
+      decrement_index_size(deps.storage, &IX_META_BOOL, slot)?;
     }
   }
 

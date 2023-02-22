@@ -1,11 +1,11 @@
 use crate::{
   error::ContractError,
-  models::{IndexSlotValue, IndexedValues, SLOT_COUNT},
+  models::{IndexSlotValue, IndexedValues, InstantiationPreset, SLOT_COUNT},
   state::{
     get_bool_index, get_next_contract_id, get_text_index, get_timestamp_index, get_u128_index,
-    get_u64_index, increment_index_size, is_allowed, ALLOWED_CODE_IDS, BOOL_INDEX_METADATA,
-    DEFAULT_CODE_ID, DEFAULT_LABEL, ID_2_INDEXED_VALUES, IX_CREATED_BY, TEXT_INDEX_METADATA,
-    TS_INDEX_METADATA, UINT128_INDEX_METADATA, UINT64_INDEX_METADATA,
+    get_u64_index, increment_index_size, is_allowed, ALLOWED_CODE_IDS, DEFAULT_CODE_ID,
+    DEFAULT_LABEL, ID_2_INDEXED_VALUES, INSTANTIATION_PRESETS, IX_CREATED_BY, IX_META_BOOL,
+    IX_META_STRING, IX_META_TIMESTAMP, IX_META_U128, IX_META_U64,
   },
 };
 use cosmwasm_std::{
@@ -22,6 +22,7 @@ pub fn create(
   admin: Option<Addr>,
   label: Option<String>,
   indices: Option<Vec<IndexSlotValue>>,
+  maybe_preset_name: Option<String>,
 ) -> Result<Response, ContractError> {
   // the signer must be authorized to this method by the ACL
   if !is_allowed(deps.storage, &deps.querier, &info.sender, "create")? {
@@ -51,14 +52,14 @@ pub fn create(
   let mut keys = IndexedValues::new();
 
   // initialize custom indices
-  if let Some(indices) = indices {
+  if let Some(indices) = &indices {
     for params in indices.iter() {
       match params.clone() {
         IndexSlotValue::Uint64 { slot, value } => {
           if slot >= SLOT_COUNT {
             return Err(ContractError::SlotOutOfBounds { slot });
           }
-          increment_index_size(deps.storage, &UINT64_INDEX_METADATA, slot)?;
+          increment_index_size(deps.storage, &IX_META_U64, slot)?;
           get_u64_index(slot)?.save(deps.storage, (value, contract_id), &true)?;
           keys.uint64[slot as usize] = Some(value);
         },
@@ -66,7 +67,7 @@ pub fn create(
           if slot >= SLOT_COUNT {
             return Err(ContractError::SlotOutOfBounds { slot });
           }
-          increment_index_size(deps.storage, &TS_INDEX_METADATA, slot)?;
+          increment_index_size(deps.storage, &IX_META_TIMESTAMP, slot)?;
           get_timestamp_index(slot)?.save(deps.storage, (value.nanos(), contract_id), &true)?;
           keys.timestamp[slot as usize] = Some(value.nanos());
         },
@@ -74,7 +75,7 @@ pub fn create(
           if slot >= SLOT_COUNT {
             return Err(ContractError::SlotOutOfBounds { slot });
           }
-          increment_index_size(deps.storage, &TEXT_INDEX_METADATA, slot)?;
+          increment_index_size(deps.storage, &IX_META_STRING, slot)?;
           get_text_index(slot)?.save(deps.storage, (value.clone(), contract_id), &true)?;
           keys.text[slot as usize] = Some(value.clone());
         },
@@ -83,7 +84,7 @@ pub fn create(
             return Err(ContractError::SlotOutOfBounds { slot });
           }
           let u8_bool = if value { 1 } else { 0 };
-          increment_index_size(deps.storage, &BOOL_INDEX_METADATA, slot)?;
+          increment_index_size(deps.storage, &IX_META_BOOL, slot)?;
           get_bool_index(slot)?.save(deps.storage, (u8_bool, contract_id), &true)?;
           keys.boolean[slot as usize] = Some(u8_bool);
         },
@@ -91,7 +92,7 @@ pub fn create(
           if slot >= SLOT_COUNT {
             return Err(ContractError::SlotOutOfBounds { slot });
           }
-          increment_index_size(deps.storage, &UINT128_INDEX_METADATA, slot)?;
+          increment_index_size(deps.storage, &IX_META_U128, slot)?;
           get_u128_index(slot)?.save(deps.storage, (value, contract_id), &true)?;
           keys.uint128[slot as usize] = Some(value);
         },
@@ -101,6 +102,12 @@ pub fn create(
 
   ID_2_INDEXED_VALUES.save(deps.storage, contract_id, &keys)?;
 
+  let computed_label = build_label(deps.storage, label, contract_id)?;
+  let computed_admin = admin
+    .clone()
+    .and_then(|addr| Some(addr.to_string()))
+    .or(Some(env.contract.address.into()));
+
   // create instantiation submsg. The instantiated contract should store the
   // sender address (of this repository contract) for it to use when calling update or
   // other methods defined by the Repository.
@@ -108,15 +115,70 @@ pub fn create(
     code_id,
     msg: instantiate_msg.clone(),
     funds: info.funds,
-    label: build_label(deps.storage, label, contract_id)?,
-    admin: admin
-      .and_then(|addr| Some(addr.to_string()))
-      .or(Some(env.contract.address.into())),
+    label: computed_label.clone(),
+    admin: computed_admin.clone(),
   };
+
+  if let Some(preset_name) = &maybe_preset_name {
+    INSTANTIATION_PRESETS.update(
+      deps.storage,
+      (admin.unwrap_or(info.sender).clone(), preset_name.clone()),
+      |maybe_preset| -> Result<InstantiationPreset, ContractError> {
+        if maybe_preset.is_none() {
+          Ok(InstantiationPreset {
+            code_id: Some(code_id),
+            msg: instantiate_msg.clone(),
+            indices: indices.clone(),
+            label: Some(computed_label.clone()),
+            admin: computed_admin
+              .clone()
+              .and_then(|s| Some(Addr::unchecked(s))),
+          })
+        } else {
+          Err(ContractError::PresetExists {})
+        }
+      },
+    )?;
+  }
+
   Ok(
     Response::new()
-      .add_attributes(vec![attr("action", "create"), attr("code_id", info.sender)])
+      .add_attributes(vec![
+        attr("action", "create"),
+        attr("code_id", code_id.to_string()),
+        attr("admin", computed_admin.clone().unwrap()),
+        attr("label", computed_label.clone()),
+        attr("preset", maybe_preset_name.unwrap_or("".to_owned()).clone()),
+      ])
       .add_submessage(SubMsg::reply_always(wasm_instantiate_msg, contract_id)),
+  )
+}
+
+pub fn create_from_preset(
+  deps: DepsMut,
+  env: Env,
+  info: MessageInfo,
+  code_id_override: Option<u64>,
+  instantiate_msg: Option<Binary>,
+  admin: Option<Addr>,
+  label: Option<String>,
+  indices: Option<Vec<IndexSlotValue>>,
+  owner_addr: Addr,
+  preset_name: String,
+) -> Result<Response, ContractError> {
+  let preset =
+    INSTANTIATION_PRESETS.load(deps.storage, (owner_addr.clone(), preset_name.clone()))?;
+
+  create(
+    deps,
+    env,
+    info,
+    code_id_override.or(preset.code_id),
+    &instantiate_msg.unwrap_or(preset.msg),
+    admin.or(preset.admin),
+    label.or(preset.label),
+    indices.or(preset.indices),
+    None,
   )
 }
 

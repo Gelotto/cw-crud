@@ -1,4 +1,6 @@
-use crate::models::{ContractMetadata, IndexMetadata, IndexSlotName, IndexedValues, Slot};
+use crate::models::{
+  ContractMetadata, IndexMetadata, IndexSlotName, IndexedValues, InstantiationPreset, Slot,
+};
 use crate::msg::InstantiateMsg;
 use crate::{error::ContractError, models::ContractID};
 use cosmwasm_std::{Addr, DepsMut, Empty, Env, MessageInfo, QuerierWrapper, Response, Storage};
@@ -42,12 +44,15 @@ pub const ID_2_INDEXED_VALUES: Map<ContractID, IndexedValues> = Map::new("id_2_i
 /// Metadata stored for each contract in this repo
 pub const METADATA: Map<Addr, ContractMetadata> = Map::new("contract_metadata");
 
+pub const INSTANTIATION_PRESETS: Map<(Addr, String), InstantiationPreset> =
+  Map::new("instantiation_presets");
+
 /// Metadata storage for each custom index
-pub const UINT64_INDEX_METADATA: Map<Slot, IndexMetadata> = Map::new("u64_index_metadata");
-pub const UINT128_INDEX_METADATA: Map<Slot, IndexMetadata> = Map::new("u128_index_metadata");
-pub const TEXT_INDEX_METADATA: Map<Slot, IndexMetadata> = Map::new("text_index_metadata");
-pub const BOOL_INDEX_METADATA: Map<Slot, IndexMetadata> = Map::new("bool_index_metadata");
-pub const TS_INDEX_METADATA: Map<Slot, IndexMetadata> = Map::new("ts_index_metadata");
+pub const IX_META_U64: Map<Slot, IndexMetadata> = Map::new("u64_index_metadata");
+pub const IX_META_U128: Map<Slot, IndexMetadata> = Map::new("u128_index_metadata");
+pub const IX_META_STRING: Map<Slot, IndexMetadata> = Map::new("text_index_metadata");
+pub const IX_META_BOOL: Map<Slot, IndexMetadata> = Map::new("bool_index_metadata");
+pub const IX_META_TIMESTAMP: Map<Slot, IndexMetadata> = Map::new("ts_index_metadata");
 
 /// Built-in indices
 pub const IX_CREATED_BY: AddrIndexMap = Map::new("ix_created_by");
@@ -129,19 +134,19 @@ pub fn initialize(
     for x in indices.iter() {
       match x {
         IndexSlotName::Uint64 { slot, name } => {
-          UINT64_INDEX_METADATA.save(deps.storage, *slot, &IndexMetadata::new(*slot, name))?
+          IX_META_U64.save(deps.storage, *slot, &IndexMetadata::new(*slot, name))?
         },
         IndexSlotName::Uint128 { slot, name } => {
-          UINT128_INDEX_METADATA.save(deps.storage, *slot, &IndexMetadata::new(*slot, name))?
+          IX_META_U128.save(deps.storage, *slot, &IndexMetadata::new(*slot, name))?
         },
         IndexSlotName::Timestamp { slot, name } => {
-          TS_INDEX_METADATA.save(deps.storage, *slot, &IndexMetadata::new(*slot, name))?
+          IX_META_TIMESTAMP.save(deps.storage, *slot, &IndexMetadata::new(*slot, name))?
         },
         IndexSlotName::Text { slot, name } => {
-          TEXT_INDEX_METADATA.save(deps.storage, *slot, &IndexMetadata::new(*slot, name))?
+          IX_META_STRING.save(deps.storage, *slot, &IndexMetadata::new(*slot, name))?
         },
         IndexSlotName::Boolean { slot, name } => {
-          BOOL_INDEX_METADATA.save(deps.storage, *slot, &IndexMetadata::new(*slot, name))?
+          IX_META_BOOL.save(deps.storage, *slot, &IndexMetadata::new(*slot, name))?
         },
       }
     }

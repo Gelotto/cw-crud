@@ -29,6 +29,9 @@ pub enum ContractError {
   #[error("AclAlreadyEnabled")]
   AclAlreadyEnabled {},
 
+  #[error("PresetExists")]
+  PresetExists {},
+
   #[error("AlreadyExists")]
   AlreadyExists {},
 

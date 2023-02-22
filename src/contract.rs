@@ -40,6 +40,7 @@ pub fn execute(
       admin,
       label,
       indices,
+      preset,
     } => execute::create(
       deps,
       env,
@@ -49,6 +50,27 @@ pub fn execute(
       admin,
       label,
       indices,
+      preset,
+    ),
+    ExecuteMsg::CreateFromPreset {
+      owner: preset_owner,
+      preset,
+      code_id,
+      msg: instantiate_msg,
+      admin,
+      label,
+      indices,
+    } => execute::create_from_preset(
+      deps,
+      env,
+      info,
+      code_id,
+      instantiate_msg,
+      admin,
+      label,
+      indices,
+      preset_owner,
+      preset,
     ),
     ExecuteMsg::Update { values } => execute::update(deps, env, info, values),
     ExecuteMsg::RenameIndex { name } => execute::rename_index(deps, env, info, name),
@@ -59,6 +81,9 @@ pub fn execute(
     ExecuteMsg::UpdateAllowedCodeIdes { code_ids } => {
       execute::update_allowed_code_ids(deps, env, info, code_ids)
     },
+    ExecuteMsg::RemovePreset {
+      preset: preset_name,
+    } => execute::remove_preset(deps, env, info, &preset_name),
   }
 }
 
