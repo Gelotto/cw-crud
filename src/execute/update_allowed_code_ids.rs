@@ -3,7 +3,7 @@ use crate::{
   state::{is_allowed, ALLOWED_CODE_IDS},
 };
 use cosmwasm_std::{attr, DepsMut, Env, MessageInfo, Response};
-
+// TODO rename to WhitelistCodeIds
 pub fn update_allowed_code_ids(
   deps: DepsMut,
   _env: Env,

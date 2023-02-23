@@ -1,13 +1,16 @@
-use cosmwasm_std::{to_binary, Addr, Binary, Empty, QuerierWrapper, StdResult, Storage, WasmMsg};
-use cw_storage_plus::Item;
-use serde::{de::DeserializeOwned, Serialize};
+use cosmwasm_std::{
+  to_binary, Addr, Binary, Empty, QuerierWrapper, StdResult, Storage, Timestamp, WasmMsg,
+};
 
 use crate::{
   loader::RepositoryStateLoader,
-  models::{ContractID, IndexBounds, IndexSlotValue},
-  msg::{ExecuteMsg, QueryMsg, Since},
+  models::{
+    ContractID, IndexBounds, IndexSlotValue, Relationship, RelationshipUpdates, Slot, TagUpdates,
+  },
+  msg::{ExecuteMsg, QueryMsg, Since, Target},
 };
 
+#[derive(Clone)]
 pub struct Repository {
   pub contract_addr: Addr,
 }
@@ -26,41 +29,188 @@ impl Repository {
     RepositoryStateLoader::new(storage, fields)
   }
 
+  pub fn update(&self) -> UpdateBuilder {
+    UpdateBuilder::new(&self.contract_addr)
+  }
+
   pub fn select(
     &self,
     querier: &QuerierWrapper<Empty>,
-    index: &IndexBounds,
+    target: &Target,
     desc: Option<bool>,
     limit: Option<u32>,
     include: Option<Vec<String>>,
     since: Option<Since>,
     meta: Option<bool>,
+    wallet: Option<Addr>,
     cursor: Option<(String, ContractID)>,
   ) -> StdResult<Binary> {
     querier.query_wasm_smart(
       self.contract_addr.clone(),
       &QueryMsg::Read {
-        index: index.clone(),
+        target: target.clone(),
         desc,
         limit,
         fields: include,
         since,
         meta,
         cursor,
+        wallet,
       },
     )
   }
+}
 
-  pub fn update(
-    &self,
-    values: Vec<IndexSlotValue>,
-  ) -> StdResult<WasmMsg> {
+#[derive(Clone)]
+pub struct UpdateBuilder {
+  repo_contract_addr: Addr,
+  values: Vec<IndexSlotValue>,
+  addr_tags_to_add: Vec<Relationship>,
+  addr_tags_to_delete: Vec<Relationship>,
+  tags_to_add: Vec<String>,
+  tags_to_delete: Vec<String>,
+}
+
+impl UpdateBuilder {
+  pub fn new(repo_contract_addr: &Addr) -> Self {
+    Self {
+      repo_contract_addr: repo_contract_addr.clone(),
+      values: vec![],
+      tags_to_add: vec![],
+      tags_to_delete: vec![],
+      addr_tags_to_add: vec![],
+      addr_tags_to_delete: vec![],
+    }
+  }
+
+  pub fn set_u64(
+    mut self,
+    slot: Slot,
+    value: u64,
+  ) -> Self {
+    self.values.push(IndexSlotValue::Uint64 { slot, value });
+    self
+  }
+
+  pub fn set_u128(
+    mut self,
+    slot: Slot,
+    value: u128,
+  ) -> Self {
+    self.values.push(IndexSlotValue::Uint128 { slot, value });
+    self
+  }
+
+  pub fn set_string(
+    mut self,
+    slot: Slot,
+    value: &String,
+  ) -> Self {
+    self.values.push(IndexSlotValue::Text {
+      slot,
+      value: value.clone(),
+    });
+    self
+  }
+
+  pub fn set_boolean(
+    mut self,
+    slot: Slot,
+    value: bool,
+  ) -> Self {
+    self.values.push(IndexSlotValue::Boolean { slot, value });
+    self
+  }
+
+  pub fn set_timestamp(
+    mut self,
+    slot: Slot,
+    value: Timestamp,
+  ) -> Self {
+    self.values.push(IndexSlotValue::Timestamp { slot, value });
+    self
+  }
+
+  pub fn tag(
+    mut self,
+    tag: impl Into<String>,
+  ) -> Self {
+    self.tags_to_add.push(tag.into());
+    self
+  }
+
+  pub fn untag(
+    mut self,
+    tag: impl Into<String>,
+  ) -> Self {
+    self.tags_to_delete.push(tag.into());
+    self
+  }
+
+  pub fn set_relationship(
+    mut self,
+    addr: &Addr,
+    name: impl Into<String>,
+  ) -> Self {
+    self.addr_tags_to_add.push(Relationship {
+      address: addr.clone(),
+      tag: name.into(),
+    });
+    self
+  }
+
+  pub fn delete_relationship(
+    mut self,
+    addr: &Addr,
+    name: impl Into<String>,
+  ) -> Self {
+    self.addr_tags_to_delete.push(Relationship {
+      address: addr.clone(),
+      tag: name.into(),
+    });
+    self
+  }
+
+  pub fn build_msg(&self) -> StdResult<WasmMsg> {
+    let values = if !self.values.is_empty() {
+      Some(self.values.clone())
+    } else {
+      None
+    };
+    let rel_updates = Some(RelationshipUpdates {
+      added: if !self.addr_tags_to_add.is_empty() {
+        Some(self.addr_tags_to_add.clone())
+      } else {
+        None
+      },
+      removed: if !self.addr_tags_to_delete.is_empty() {
+        Some(self.addr_tags_to_delete.clone())
+      } else {
+        None
+      },
+    });
+    let tags = Some(TagUpdates {
+      added: if !self.tags_to_add.is_empty() {
+        Some(self.tags_to_add.clone())
+      } else {
+        None
+      },
+      removed: if !self.tags_to_delete.is_empty() {
+        Some(self.tags_to_delete.clone())
+      } else {
+        None
+      },
+    });
     Ok(WasmMsg::Execute {
-      contract_addr: self.contract_addr.clone().into(),
+      contract_addr: self.repo_contract_addr.clone().into(),
       funds: vec![],
       msg: to_binary(&ExecuteMsg::Update {
+        relationships: rel_updates,
+        tags,
+        // base64 encode string values
         values: Some(
           values
+            .unwrap_or(vec![])
             .iter()
             .map(|v| {
               if let IndexSlotValue::Text { slot, value } = v {
@@ -76,26 +226,5 @@ impl Repository {
         ),
       })?,
     })
-  }
-
-  pub fn may_load_item<'a, T>(
-    storage: &dyn Storage,
-    fields: &Option<Vec<String>>,
-    field_name: &str,
-    item: &Item<'a, T>,
-  ) -> StdResult<Option<T>>
-  where
-    T: DeserializeOwned,
-    T: Serialize,
-  {
-    if let Some(fields) = fields {
-      if fields.is_empty() || fields.contains(&field_name.to_owned()) {
-        item.may_load(storage)
-      } else {
-        Ok(None)
-      }
-    } else {
-      Ok(None)
-    }
   }
 }

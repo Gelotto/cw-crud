@@ -1,10 +1,14 @@
 use crate::{
   error::ContractError,
-  models::{ContractID, IndexMetadata, IndexPrefix, IndexSlotValue, Slot, SLOT_COUNT},
+  models::{
+    ContractID, IndexMetadata, IndexPrefix, IndexSlotValue, RelationshipUpdates, Slot, TagUpdates,
+    SLOT_COUNT,
+  },
   state::{
     get_bool_index, get_contract_id, get_text_index, get_timestamp_index, get_u128_index,
     get_u64_index, increment_index_size, ID_2_INDEXED_VALUES, IX_META_BOOL, IX_META_STRING,
-    IX_META_TIMESTAMP, IX_META_U128, IX_META_U64, IX_REV, METADATA,
+    IX_META_TIMESTAMP, IX_META_U128, IX_META_U64, IX_REV, METADATA, RELATIONSHIPS,
+    TAGGED_CONTRACT_IDS,
   },
   state::{owns_contract, IX_UPDATED_AT},
 };
@@ -15,19 +19,32 @@ pub fn update(
   deps: DepsMut,
   env: Env,
   info: MessageInfo,
-  index_updates: Option<Vec<IndexSlotValue>>,
+  maybe_index_updates: Option<Vec<IndexSlotValue>>,
+  maybe_relationship_updates: Option<RelationshipUpdates>,
+  maybe_tag_updates: Option<TagUpdates>,
 ) -> Result<Response, ContractError> {
   let contract_addr = &info.sender;
+
+  if !owns_contract(deps.storage, contract_addr) {
+    // this function can be executed only by a contract instantiated through
+    // this repository.
+    return Err(ContractError::NotAuthorized {});
+  }
 
   deps
     .api
     .debug(format!("executing repository update for: {}", info.sender).as_str());
 
-  if !owns_contract(deps.storage, contract_addr) {
-    return Err(ContractError::NotAuthorized {});
+  let contract_id = get_contract_id(deps.storage, contract_addr)?;
+
+  if let Some(rel_updates) = maybe_relationship_updates {
+    update_relationships(deps.storage, contract_id, &rel_updates)?;
   }
 
-  let contract_id = get_contract_id(deps.storage, contract_addr)?;
+  if let Some(tag_updates) = maybe_tag_updates {
+    update_contract_tags(deps.storage, contract_id, &tag_updates)?;
+  }
+
   let mut meta = METADATA.load(deps.storage, contract_addr.clone())?;
 
   // update updated_at index
@@ -35,6 +52,7 @@ pub fn update(
     IX_UPDATED_AT.remove(deps.storage, (meta.updated_at.nanos(), contract_id));
     IX_UPDATED_AT.save(deps.storage, (env.block.time.nanos(), contract_id), &true)?;
   } else {
+    // show never come here
     return Err(ContractError::NotInIndex {
       msg: format!("old value not in updated_at index"),
     });
@@ -45,6 +63,7 @@ pub fn update(
     IX_REV.remove(deps.storage, (meta.rev, contract_id));
     IX_REV.save(deps.storage, (meta.rev + 1, contract_id), &true)?;
   } else {
+    // show never come here
     return Err(ContractError::NotInIndex {
       msg: format!("old value not in rev index"),
     });
@@ -57,7 +76,7 @@ pub fn update(
   METADATA.save(deps.storage, contract_addr.clone(), &meta)?;
 
   // update other indices
-  if let Some(updates) = index_updates {
+  if let Some(updates) = maybe_index_updates {
     let mut ix_keys = ID_2_INDEXED_VALUES.load(deps.storage, contract_id)?;
 
     for u in updates.iter() {
@@ -282,4 +301,36 @@ fn update_bool_index(
   )?;
 
   Ok(new_val.clone())
+}
+
+fn update_contract_tags(
+  storage: &mut dyn Storage,
+  contract_id: ContractID,
+  tag_updates: &TagUpdates,
+) -> Result<(), ContractError> {
+  for tag in tag_updates.removed.as_ref().unwrap_or(&vec![]).iter() {
+    TAGGED_CONTRACT_IDS.remove(storage, (tag.clone(), contract_id));
+  }
+  for tag in tag_updates.added.as_ref().unwrap_or(&vec![]).iter() {
+    TAGGED_CONTRACT_IDS.save(storage, (tag.clone(), contract_id), &true)?;
+  }
+  Ok(())
+}
+
+fn update_relationships(
+  storage: &mut dyn Storage,
+  contract_id: ContractID,
+  rel_updates: &RelationshipUpdates,
+) -> Result<(), ContractError> {
+  for rel in rel_updates.removed.as_ref().unwrap_or(&vec![]).iter() {
+    RELATIONSHIPS.remove(storage, (rel.address.clone(), rel.tag.clone(), contract_id))
+  }
+  for rel in rel_updates.added.as_ref().unwrap_or(&vec![]).iter() {
+    RELATIONSHIPS.save(
+      storage,
+      (rel.address.clone(), rel.tag.clone(), contract_id),
+      &true,
+    )?;
+  }
+  Ok(())
 }

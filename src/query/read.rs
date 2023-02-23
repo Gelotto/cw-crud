@@ -9,10 +9,11 @@ use cw_storage_plus::{Bound, Map, PrefixBound};
 use crate::{
   error::ContractError,
   models::{ContractID, IndexBounds},
-  msg::{ContractStateEnvelope, ImplementorQueryMsg, ReadResponse, Since},
+  msg::{ContractStateEnvelope, ImplementorQueryMsg, Page, Since, Target},
   state::{
     get_bool_index, get_text_index, get_timestamp_index, get_u128_index, get_u64_index, ID_2_ADDR,
     IX_CODE_ID, IX_CREATED_AT, IX_CREATED_BY, IX_HEIGHT, IX_REV, IX_UPDATED_AT, METADATA,
+    RELATIONSHIPS, TAGGED_CONTRACT_IDS,
   },
 };
 
@@ -20,115 +21,92 @@ pub const MIN_LIMIT: u32 = 1;
 pub const MAX_LIMIT: u32 = 50;
 pub const DEFAULT_LIMIT: u32 = 25;
 
-/// Return total number of contracts in the repo.
 pub fn read(
   deps: Deps,
-  index_bounds: &IndexBounds,
-  desc: Option<bool>,
-  raw_limit: Option<u32>,
-  fields: Option<Vec<String>>,
-  since: Option<Since>,
-  meta: Option<bool>,
-  wallet: Option<Addr>,
-  cursor: Option<(String, ContractID)>,
-) -> Result<ReadResponse, ContractError> {
+  target: &Target,
+  maybe_desc: Option<bool>,
+  maybe_limit: Option<u32>,
+  maybe_fields: Option<Vec<String>>,
+  maybe_since: Option<Since>,
+  maybe_meta: Option<bool>,
+  maybe_wallet: Option<Addr>,
+  maybe_cursor: Option<(String, ContractID)>,
+) -> Result<Page, ContractError> {
   // clamp limit to min and max bounds
-  let limit = raw_limit
+  let limit = maybe_limit
     .unwrap_or(DEFAULT_LIMIT)
     .clamp(MIN_LIMIT, MAX_LIMIT);
 
   // resolve Order enum from desc flag
-  let order = if desc.unwrap_or(false) {
+  let order = if maybe_desc.unwrap_or(false) {
     Order::Descending
   } else {
     Order::Ascending
   };
 
-  let store = deps.storage;
-  let api = deps.api;
-
-  // compute vec of contract ID's from an index
-  let keys: Vec<(String, ContractID)> = match index_bounds.clone() {
-    IndexBounds::Address { equals, between } => {
-      paginate_metadata(store, api, cursor, equals, between, order, limit)?
-    },
-    IndexBounds::CreatedBy { equals, between } => {
-      let ix = &IX_CREATED_BY;
-      paginate_addr_index(store, api, ix, equals, between, order, limit, cursor)?
-    },
-    IndexBounds::CreatedAt { equals, between } => {
-      let ix = &IX_CREATED_AT;
-      paginate_ts_index(store, ix, equals, between, order, limit, cursor)?
-    },
-    IndexBounds::UpdatedAt { equals, between } => {
-      let ix = &IX_UPDATED_AT;
-      paginate_ts_index(store, ix, equals, between, order, limit, cursor)?
-    },
-    IndexBounds::Uint64 {
-      slot,
-      between,
-      equals,
-    } => {
-      let map = &get_u64_index(slot)?;
-      paginate_u64_index(deps.storage, map, equals, between, order, limit, cursor)?
-    },
-    IndexBounds::Text {
-      slot,
-      equals,
-      between,
-    } => {
-      let map = &get_text_index(slot)?;
-      paginate_str_index(deps.storage, map, equals, between, order, limit, cursor)?
-    },
-    IndexBounds::Timestamp {
-      slot,
-      equals,
-      between,
-    } => {
-      let ix = &get_timestamp_index(slot)?;
-      paginate_ts_index(store, ix, equals, between, order, limit, cursor)?
-    },
-    IndexBounds::Rev { equals, between } => {
-      let ix = &IX_REV;
-      paginate_u64_index(store, ix, equals, between, order, limit, cursor)?
-    },
-    IndexBounds::CodeId { equals, between } => {
-      let ix = &IX_CODE_ID;
-      paginate_u64_index(store, ix, equals, between, order, limit, cursor)?
-    },
-    IndexBounds::Height { equals, between } => {
-      let ix = &IX_HEIGHT;
-      paginate_u64_index(store, ix, equals, between, order, limit, cursor)?
-    },
-    IndexBounds::Boolean { slot, start, stop } => {
-      let map = get_bool_index(slot)?;
-      paginate_bool_index(deps.storage, &map, start, stop, order, limit, cursor)?
-    },
-    IndexBounds::Uint128 {
-      slot,
-      between,
-      equals,
-    } => {
-      let map = &get_u128_index(slot)?;
-      paginate_u128_index(deps.storage, map, equals, between, order, limit, cursor)?
-    },
-  };
-
   // build vec of returned contract addresses from contract ID's, along with
   // any queried state from each contract, provided params is not None.
-  let mut page: Vec<ContractStateEnvelope> = Vec::with_capacity(keys.len());
-  let ret_cursor: Option<(String, ContractID)> = keys.last().and_then(|x| Some(x.clone())).or(None);
+  let page: Page = match &target {
+    Target::Index(bounds) => {
+      let keys = read_index(deps, bounds, order, limit, maybe_cursor)?;
+      build_contracts_page(
+        deps,
+        &keys,
+        maybe_fields,
+        maybe_since,
+        maybe_meta,
+        maybe_wallet,
+      )
+    },
+    Target::Tag(tag) => {
+      let keys = read_tags(deps, tag, order, limit, maybe_cursor)?;
+      build_contracts_page(
+        deps,
+        &keys,
+        maybe_fields,
+        maybe_since,
+        maybe_meta,
+        maybe_wallet,
+      )
+    },
+    Target::Relationship((rel_subject_addr, rel_name)) => {
+      let keys = read_relationship(deps, rel_subject_addr, rel_name, order, limit, maybe_cursor)?;
+      build_contracts_page(
+        deps,
+        &keys,
+        maybe_fields,
+        maybe_since,
+        maybe_meta,
+        maybe_wallet,
+      )
+    },
+  }?;
+
+  Ok(page)
+}
+
+fn build_contracts_page(
+  deps: Deps,
+  keys: &Vec<(String, ContractID)>,
+  maybe_fields: Option<Vec<String>>,
+  maybe_since: Option<Since>,
+  maybe_meta: Option<bool>,
+  maybe_wallet: Option<Addr>,
+) -> Result<Page, ContractError> {
+  let mut page_data: Vec<ContractStateEnvelope> = Vec::with_capacity(keys.len());
+  let next_cursor: Option<(String, ContractID)> =
+    keys.last().and_then(|x| Some(x.clone())).or(None);
 
   for (_, id) in keys.iter() {
     let contract_addr = ID_2_ADDR.load(deps.storage, *id)?;
-    let some_meta = if meta.unwrap_or(false) {
+    let some_meta = if maybe_meta.unwrap_or(false) {
       METADATA.may_load(deps.storage, contract_addr.clone())?
     } else {
       None
     };
 
     //skip if not modified since modified_since revision or timestamp
-    if let Some(since) = since.clone() {
+    if let Some(since) = maybe_since.clone() {
       let meta = if let Some(meta) = &some_meta {
         meta.clone()
       } else {
@@ -149,30 +127,222 @@ pub fn read(
     }
 
     // query state from contract if fields vec is not None
-    let state = if fields.is_some() {
+    let state = if maybe_fields.is_some() {
       // an empty fields vec should be interpreted as "select *"
       Some(query_smart_no_deserialize(
         deps.api,
         deps.querier,
         &contract_addr,
-        &fields,
-        &wallet,
+        &maybe_fields,
+        &maybe_wallet,
       )?)
     } else {
       None
     };
 
-    page.push(ContractStateEnvelope {
+    page_data.push(ContractStateEnvelope {
       address: contract_addr.clone(),
       meta: some_meta,
       state,
     })
   }
 
-  Ok(ReadResponse {
-    count: page.len() as u8,
-    cursor: ret_cursor,
-    page,
+  Ok(Page::Contracts {
+    page: page_data,
+    cursor: next_cursor,
+  })
+}
+
+fn read_tags(
+  deps: Deps,
+  tag: &String,
+  order: Order,
+  limit: u32,
+  maybe_cursor: Option<(String, ContractID)>,
+) -> Result<Vec<(String, ContractID)>, ContractError> {
+  let map = TAGGED_CONTRACT_IDS;
+
+  let iter = if let Some((tag, min_contract_id)) = maybe_cursor {
+    let bound = Some(Bound::Exclusive((
+      (tag.clone(), min_contract_id),
+      PhantomData,
+    )));
+    match order {
+      Order::Ascending => {
+        let upper = Some(Bound::Inclusive((
+          (tag.clone(), ContractID::MAX),
+          PhantomData,
+        )));
+        map.range(deps.storage, bound, upper, order)
+      },
+      Order::Descending => {
+        let lower = Some(Bound::Inclusive((
+          (tag.clone(), ContractID::MIN),
+          PhantomData,
+        )));
+        map.range(deps.storage, lower, bound, order)
+      },
+    }
+  } else {
+    map.prefix_range(
+      deps.storage,
+      Some(PrefixBound::Inclusive((tag.clone(), PhantomData))),
+      Some(PrefixBound::Inclusive((tag.clone(), PhantomData))),
+      order,
+    )
+  };
+
+  collect(iter, limit, |k, _| Ok(k.clone()))
+}
+
+fn read_relationship(
+  deps: Deps,
+  rel_subject_addr: &Addr,
+  rel_name: &String,
+  order: Order,
+  limit: u32,
+  maybe_cursor: Option<(String, ContractID)>,
+) -> Result<Vec<(String, ContractID)>, ContractError> {
+  let map = RELATIONSHIPS;
+
+  let iter = if let Some((name, min_contract_id)) = maybe_cursor {
+    let bound = Some(Bound::Exclusive((
+      (rel_subject_addr.clone(), name.clone(), min_contract_id),
+      PhantomData,
+    )));
+    match order {
+      Order::Ascending => {
+        let upper = Some(Bound::Inclusive((
+          (rel_subject_addr.clone(), name.clone(), ContractID::MAX),
+          PhantomData,
+        )));
+        map.range(deps.storage, bound, upper, order)
+      },
+      Order::Descending => {
+        let lower = Some(Bound::Inclusive((
+          (rel_subject_addr.clone(), name.clone(), ContractID::MIN),
+          PhantomData,
+        )));
+        map.range(deps.storage, lower, bound, order)
+      },
+    }
+  } else {
+    map.range(
+      deps.storage,
+      Some(Bound::Inclusive((
+        (rel_subject_addr.clone(), rel_name.clone(), ContractID::MIN),
+        PhantomData,
+      ))),
+      Some(Bound::Inclusive((
+        (rel_subject_addr.clone(), rel_name.clone(), ContractID::MAX),
+        PhantomData,
+      ))),
+      order,
+    )
+  };
+
+  collect(iter, limit, |(_, name, id), _| Ok((name.clone(), id)))
+}
+
+fn read_index(
+  deps: Deps,
+  bounds: &IndexBounds,
+  order: Order,
+  limit: u32,
+  maybe_cursor: Option<(String, ContractID)>,
+) -> Result<Vec<(String, ContractID)>, ContractError> {
+  let store = deps.storage;
+  let api = deps.api;
+
+  // compute vec of contract ID's from an index
+  Ok(match bounds.clone() {
+    IndexBounds::Address { equals, between } => {
+      paginate_metadata(store, api, maybe_cursor, equals, between, order, limit)?
+    },
+    IndexBounds::CreatedBy { equals, between } => {
+      let ix = &IX_CREATED_BY;
+      paginate_addr_index(store, api, ix, equals, between, order, limit, maybe_cursor)?
+    },
+    IndexBounds::CreatedAt { equals, between } => {
+      let ix = &IX_CREATED_AT;
+      paginate_ts_index(store, ix, equals, between, order, limit, maybe_cursor)?
+    },
+    IndexBounds::UpdatedAt { equals, between } => {
+      let ix = &IX_UPDATED_AT;
+      paginate_ts_index(store, ix, equals, between, order, limit, maybe_cursor)?
+    },
+    IndexBounds::Uint64 {
+      slot,
+      between,
+      equals,
+    } => {
+      let map = &get_u64_index(slot)?;
+      paginate_u64_index(
+        deps.storage,
+        map,
+        equals,
+        between,
+        order,
+        limit,
+        maybe_cursor,
+      )?
+    },
+    IndexBounds::Text {
+      slot,
+      equals,
+      between,
+    } => {
+      let map = &get_text_index(slot)?;
+      paginate_str_index(
+        deps.storage,
+        map,
+        equals,
+        between,
+        order,
+        limit,
+        maybe_cursor,
+      )?
+    },
+    IndexBounds::Timestamp {
+      slot,
+      equals,
+      between,
+    } => {
+      let ix = &get_timestamp_index(slot)?;
+      paginate_ts_index(store, ix, equals, between, order, limit, maybe_cursor)?
+    },
+    IndexBounds::Rev { equals, between } => {
+      let ix = &IX_REV;
+      paginate_u64_index(store, ix, equals, between, order, limit, maybe_cursor)?
+    },
+    IndexBounds::CodeId { equals, between } => {
+      let ix = &IX_CODE_ID;
+      paginate_u64_index(store, ix, equals, between, order, limit, maybe_cursor)?
+    },
+    IndexBounds::Height { equals, between } => {
+      let ix = &IX_HEIGHT;
+      paginate_u64_index(store, ix, equals, between, order, limit, maybe_cursor)?
+    },
+    IndexBounds::Boolean { slot, start, stop } => {
+      let map = get_bool_index(slot)?;
+      paginate_bool_index(deps.storage, &map, start, stop, order, limit, maybe_cursor)?
+    },
+    IndexBounds::Uint128 {
+      slot,
+      between,
+      equals,
+    } => {
+      let map = &get_u128_index(slot)?;
+      paginate_u128_index(
+        deps.storage,
+        map,
+        equals,
+        between,
+        order,
+        limit,
+        maybe_cursor,
+      )?
+    },
   })
 }
 
@@ -263,96 +433,6 @@ fn paginate_metadata(
     iter,
     limit,
     |k, v| -> Result<(String, ContractID), ContractError> { Ok((k.to_string(), v.id)) },
-  );
-}
-
-fn paginate_ts_index<'a>(
-  store: &dyn Storage,
-  map: &Map<'a, (u64, ContractID), bool>,
-  equals: Option<Timestamp>,
-  between: Option<(Option<Timestamp>, Option<Timestamp>)>,
-  order: Order,
-  limit: u32,
-  raw_cursor: Option<(String, ContractID)>,
-) -> Result<Vec<(String, ContractID)>, ContractError> {
-  paginate_u64_index(
-    store,
-    map,
-    equals.and_then(|x| Some(x.nanos())).or(None),
-    between
-      .and_then(|(l, u)| {
-        Some((
-          l.and_then(|t| Some(t.nanos())).or(None),
-          u.and_then(|t| Some(t.nanos())).or(None),
-        ))
-      })
-      .or(None),
-    order,
-    limit,
-    raw_cursor,
-  )
-}
-
-fn paginate_addr_index<'a>(
-  store: &dyn Storage,
-  api: &dyn Api,
-  map: &Map<'a, (Addr, ContractID), bool>,
-  equals: Option<Addr>,
-  between: Option<(Option<Addr>, Option<Addr>)>,
-  order: Order,
-  limit: u32,
-  cursor: Option<(String, ContractID)>,
-) -> Result<Vec<(String, ContractID)>, ContractError> {
-  let (start, stop, is_exclusive) = if let Some(value) = equals {
-    (Some(value.clone()), Some(value.clone()), false)
-  } else if let Some((lower, upper)) = between {
-    (lower, upper, true)
-  } else {
-    (None, None, true)
-  };
-
-  let iter = if let Some((x, id)) = cursor {
-    let start = if let Ok(addr) = api.addr_validate(x.as_str()) {
-      Some(Bound::Exclusive(((addr, id), PhantomData)))
-    } else {
-      None
-    };
-    let stop = stop
-      .and_then(|addr| {
-        Some(if is_exclusive {
-          Bound::Exclusive(((addr, 0), PhantomData))
-        } else {
-          Bound::Inclusive(((addr, 0), PhantomData))
-        })
-      })
-      .or(None);
-    match order {
-      Order::Ascending => map.range(store, start, stop, order),
-      Order::Descending => map.range(store, stop, start, order),
-    }
-  } else {
-    map.prefix_range(
-      store,
-      start
-        .and_then(|n| Some(PrefixBound::Inclusive((n, PhantomData))))
-        .or(None),
-      stop
-        .and_then(|n| {
-          Some(if is_exclusive {
-            PrefixBound::Exclusive((n, PhantomData))
-          } else {
-            PrefixBound::Inclusive((n, PhantomData))
-          })
-        })
-        .or(None),
-      order,
-    )
-  };
-
-  return collect(
-    iter,
-    limit,
-    |(addr, id), _| -> Result<(String, ContractID), ContractError> { Ok((addr.to_string(), id)) },
   );
 }
 
@@ -577,6 +657,96 @@ fn paginate_str_index<'a>(
     limit,
     |k, _| -> Result<(String, ContractID), ContractError> { Ok(k) },
   );
+}
+
+fn paginate_addr_index<'a>(
+  store: &dyn Storage,
+  api: &dyn Api,
+  map: &Map<'a, (Addr, ContractID), bool>,
+  equals: Option<Addr>,
+  between: Option<(Option<Addr>, Option<Addr>)>,
+  order: Order,
+  limit: u32,
+  cursor: Option<(String, ContractID)>,
+) -> Result<Vec<(String, ContractID)>, ContractError> {
+  let (start, stop, is_exclusive) = if let Some(value) = equals {
+    (Some(value.clone()), Some(value.clone()), false)
+  } else if let Some((lower, upper)) = between {
+    (lower, upper, true)
+  } else {
+    (None, None, true)
+  };
+
+  let iter = if let Some((x, id)) = cursor {
+    let start = if let Ok(addr) = api.addr_validate(x.as_str()) {
+      Some(Bound::Exclusive(((addr, id), PhantomData)))
+    } else {
+      None
+    };
+    let stop = stop
+      .and_then(|addr| {
+        Some(if is_exclusive {
+          Bound::Exclusive(((addr, 0), PhantomData))
+        } else {
+          Bound::Inclusive(((addr, 0), PhantomData))
+        })
+      })
+      .or(None);
+    match order {
+      Order::Ascending => map.range(store, start, stop, order),
+      Order::Descending => map.range(store, stop, start, order),
+    }
+  } else {
+    map.prefix_range(
+      store,
+      start
+        .and_then(|n| Some(PrefixBound::Inclusive((n, PhantomData))))
+        .or(None),
+      stop
+        .and_then(|n| {
+          Some(if is_exclusive {
+            PrefixBound::Exclusive((n, PhantomData))
+          } else {
+            PrefixBound::Inclusive((n, PhantomData))
+          })
+        })
+        .or(None),
+      order,
+    )
+  };
+
+  return collect(
+    iter,
+    limit,
+    |(addr, id), _| -> Result<(String, ContractID), ContractError> { Ok((addr.to_string(), id)) },
+  );
+}
+
+fn paginate_ts_index<'a>(
+  store: &dyn Storage,
+  map: &Map<'a, (u64, ContractID), bool>,
+  equals: Option<Timestamp>,
+  between: Option<(Option<Timestamp>, Option<Timestamp>)>,
+  order: Order,
+  limit: u32,
+  raw_cursor: Option<(String, ContractID)>,
+) -> Result<Vec<(String, ContractID)>, ContractError> {
+  paginate_u64_index(
+    store,
+    map,
+    equals.and_then(|x| Some(x.nanos())).or(None),
+    between
+      .and_then(|(l, u)| {
+        Some((
+          l.and_then(|t| Some(t.nanos())).or(None),
+          u.and_then(|t| Some(t.nanos())).or(None),
+        ))
+      })
+      .or(None),
+    order,
+    limit,
+    raw_cursor,
+  )
 }
 
 pub fn collect<'a, D, T, R, E, F>(

@@ -31,6 +31,16 @@ pub const COUNT: Item<u64> = Item::new("count");
 /// Address for ACL contract used by this repo
 pub const ACL_CONTRACT_ADDR: Item<Option<Addr>> = Item::new("acl_contract_addr");
 
+/// named presets stored for instantiating tx sender
+pub const PRESETS: Map<(Addr, String), InstantiationPreset> = Map::new("presets");
+
+/// RELATIONSHIPS is used to enable querying contracts associated with a given
+/// wallet address through a relationship name.
+pub const RELATIONSHIPS: Map<(Addr, String, ContractID), bool> = Map::new("relationships");
+
+/// TAGGED_ADDRESSES is for looking up contract addresses by string tag
+pub const TAGGED_CONTRACT_IDS: Map<(String, ContractID), bool> = Map::new("tagged_contract_ids");
+
 /// Lookup table from contract ID to addr
 pub const ID_2_ADDR: Map<ContractID, Addr> = Map::new("id_2_addr");
 
@@ -43,9 +53,6 @@ pub const ID_2_INDEXED_VALUES: Map<ContractID, IndexedValues> = Map::new("id_2_i
 
 /// Metadata stored for each contract in this repo
 pub const METADATA: Map<Addr, ContractMetadata> = Map::new("contract_metadata");
-
-pub const INSTANTIATION_PRESETS: Map<(Addr, String), InstantiationPreset> =
-  Map::new("instantiation_presets");
 
 /// Metadata storage for each custom index
 pub const IX_META_U64: Map<Slot, IndexMetadata> = Map::new("u64_index_metadata");

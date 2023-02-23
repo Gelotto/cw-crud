@@ -1,4 +1,4 @@
-use cosmwasm_std::{Deps, Order, StdResult, Storage};
+use cosmwasm_std::{Addr, Deps, Order, StdResult, Storage};
 use cw_storage_plus::Map;
 
 use crate::{
@@ -15,6 +15,7 @@ use crate::{
 pub fn select(
   deps: Deps,
   fields: Option<Vec<String>>,
+  _wallet: Option<Addr>,
 ) -> Result<SelectResponse, ContractError> {
   let loader = RepositoryStateLoader::new(deps.storage, &fields);
   Ok(SelectResponse {

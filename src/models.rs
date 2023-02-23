@@ -6,6 +6,7 @@ pub const SLOT_COUNT: u8 = 5;
 pub type ContractID = u64;
 pub type IndexTypeCode = u8;
 pub type Slot = u8;
+pub type Cursor = (String, ContractID);
 
 #[cw_serde]
 pub struct ContractMetadata {
@@ -48,6 +49,25 @@ pub struct InstantiationPreset {
   pub admin: Option<Addr>,
   pub indices: Option<Vec<IndexSlotValue>>,
   pub label: Option<String>,
+  pub tags: Option<Vec<String>>,
+}
+
+#[cw_serde]
+pub struct Relationship {
+  pub address: Addr,
+  pub tag: String,
+}
+
+#[cw_serde]
+pub struct TagUpdates {
+  pub added: Option<Vec<String>>,
+  pub removed: Option<Vec<String>>,
+}
+
+#[cw_serde]
+pub struct RelationshipUpdates {
+  pub added: Option<Vec<Relationship>>,
+  pub removed: Option<Vec<Relationship>>,
 }
 
 #[cw_serde]

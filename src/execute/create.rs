@@ -4,8 +4,8 @@ use crate::{
   state::{
     get_bool_index, get_next_contract_id, get_text_index, get_timestamp_index, get_u128_index,
     get_u64_index, increment_index_size, is_allowed, ALLOWED_CODE_IDS, DEFAULT_CODE_ID,
-    DEFAULT_LABEL, ID_2_INDEXED_VALUES, INSTANTIATION_PRESETS, IX_CREATED_BY, IX_META_BOOL,
-    IX_META_STRING, IX_META_TIMESTAMP, IX_META_U128, IX_META_U64,
+    DEFAULT_LABEL, ID_2_INDEXED_VALUES, IX_CREATED_BY, IX_META_BOOL, IX_META_STRING,
+    IX_META_TIMESTAMP, IX_META_U128, IX_META_U64, PRESETS, TAGGED_CONTRACT_IDS,
   },
 };
 use cosmwasm_std::{
@@ -17,12 +17,13 @@ pub fn create(
   deps: DepsMut,
   env: Env,
   info: MessageInfo,
-  code_id_override: Option<u64>,
+  maybe_code_id: Option<u64>,
   instantiate_msg: &Binary,
-  admin: Option<Addr>,
-  label: Option<String>,
-  indices: Option<Vec<IndexSlotValue>>,
+  maybe_admin: Option<Addr>,
+  maybe_label: Option<String>,
+  maybe_indices: Option<Vec<IndexSlotValue>>,
   maybe_preset_name: Option<String>,
+  maybe_tags: Option<Vec<String>>,
 ) -> Result<Response, ContractError> {
   // the signer must be authorized to this method by the ACL
   if !is_allowed(deps.storage, &deps.querier, &info.sender, "create")? {
@@ -30,7 +31,7 @@ pub fn create(
   }
 
   // use specified code ID for fall back on default
-  let code_id = code_id_override.unwrap_or(DEFAULT_CODE_ID.load(deps.storage)?);
+  let code_id = maybe_code_id.unwrap_or(DEFAULT_CODE_ID.load(deps.storage)?);
 
   // abort if code ID not whitelisted
   if !ALLOWED_CODE_IDS.has(deps.storage, code_id) {
@@ -44,6 +45,11 @@ pub fn create(
   // necessary.
   let contract_id = get_next_contract_id(deps.storage)?;
 
+  // store contract in association with the given tags
+  for tag in maybe_tags.clone().unwrap_or_else(|| vec![]).iter() {
+    TAGGED_CONTRACT_IDS.save(deps.storage, (tag.clone(), contract_id), &true)?;
+  }
+
   IX_CREATED_BY.save(deps.storage, (info.sender.clone(), contract_id), &true)?;
 
   // we use "keys" to keep track of which custom index keys are associated
@@ -52,7 +58,7 @@ pub fn create(
   let mut keys = IndexedValues::new();
 
   // initialize custom indices
-  if let Some(indices) = &indices {
+  if let Some(indices) = &maybe_indices {
     for params in indices.iter() {
       match params.clone() {
         IndexSlotValue::Uint64 { slot, value } => {
@@ -102,8 +108,8 @@ pub fn create(
 
   ID_2_INDEXED_VALUES.save(deps.storage, contract_id, &keys)?;
 
-  let computed_label = build_label(deps.storage, label, contract_id)?;
-  let computed_admin = admin
+  let computed_label = build_label(deps.storage, maybe_label, contract_id)?;
+  let computed_admin = maybe_admin
     .clone()
     .and_then(|addr| Some(addr.to_string()))
     .or(Some(env.contract.address.into()));
@@ -120,15 +126,16 @@ pub fn create(
   };
 
   if let Some(preset_name) = &maybe_preset_name {
-    INSTANTIATION_PRESETS.update(
+    PRESETS.update(
       deps.storage,
-      (admin.unwrap_or(info.sender).clone(), preset_name.clone()),
+      (info.sender.clone(), preset_name.clone()),
       |maybe_preset| -> Result<InstantiationPreset, ContractError> {
         if maybe_preset.is_none() {
           Ok(InstantiationPreset {
             code_id: Some(code_id),
             msg: instantiate_msg.clone(),
-            indices: indices.clone(),
+            tags: maybe_tags.clone(),
+            indices: maybe_indices.clone(),
             label: Some(computed_label.clone()),
             admin: computed_admin
               .clone()
@@ -157,27 +164,28 @@ pub fn create_from_preset(
   deps: DepsMut,
   env: Env,
   info: MessageInfo,
-  code_id_override: Option<u64>,
-  instantiate_msg: Option<Binary>,
-  admin: Option<Addr>,
-  label: Option<String>,
-  indices: Option<Vec<IndexSlotValue>>,
+  maybe_code_id: Option<u64>,
+  maybe_instantiate_msg: Option<Binary>,
+  maybe_admin: Option<Addr>,
+  maybe_label: Option<String>,
+  maybe_indices: Option<Vec<IndexSlotValue>>,
   owner_addr: Addr,
   preset_name: String,
+  maybe_tags: Option<Vec<String>>,
 ) -> Result<Response, ContractError> {
-  let preset =
-    INSTANTIATION_PRESETS.load(deps.storage, (owner_addr.clone(), preset_name.clone()))?;
+  let preset = PRESETS.load(deps.storage, (owner_addr.clone(), preset_name.clone()))?;
 
   create(
     deps,
     env,
     info,
-    code_id_override.or(preset.code_id),
-    &instantiate_msg.unwrap_or(preset.msg),
-    admin.or(preset.admin),
-    label.or(preset.label),
-    indices.or(preset.indices),
+    maybe_code_id.or(preset.code_id),
+    &maybe_instantiate_msg.unwrap_or(preset.msg),
+    maybe_admin.or(preset.admin),
+    maybe_label.or(preset.label),
+    maybe_indices.or(preset.indices),
     None,
+    maybe_tags,
   )
 }
 

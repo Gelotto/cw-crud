@@ -3,7 +3,7 @@ use cosmwasm_std::{Addr, Binary, Timestamp};
 
 use crate::models::{
   ContractID, ContractMetadata, IndexBounds, IndexMetadataView, IndexSlotName, IndexSlotValue,
-  IndexedValues,
+  IndexedValues, RelationshipUpdates, TagUpdates,
 };
 
 #[cw_serde]
@@ -24,6 +24,7 @@ pub enum ExecuteMsg {
     label: Option<String>,
     indices: Option<Vec<IndexSlotValue>>,
     preset: Option<String>,
+    tags: Option<Vec<String>>,
   },
   CreateFromPreset {
     owner: Addr,
@@ -33,12 +34,15 @@ pub enum ExecuteMsg {
     admin: Option<Addr>,
     label: Option<String>,
     indices: Option<Vec<IndexSlotValue>>,
+    tags: Option<Vec<String>>,
   },
   RemovePreset {
     preset: String,
   },
   Update {
     values: Option<Vec<IndexSlotValue>>,
+    relationships: Option<RelationshipUpdates>,
+    tags: Option<TagUpdates>,
   },
   Remove {
     contract_addr: Addr,
@@ -55,16 +59,17 @@ pub enum ExecuteMsg {
 }
 
 #[cw_serde]
+pub enum Target {
+  Index(IndexBounds),
+  Relationship((Addr, String)), // subject addr, rel name
+  Tag(String),                  // tag associated with one or more contracts
+}
+
+#[cw_serde]
 pub enum QueryMsg {
   Count {},
-  Select {
-    fields: Option<Vec<String>>,
-  },
-  Values {
-    contract_addr: Addr,
-  },
   Read {
-    index: IndexBounds,
+    target: Target,
     fields: Option<Vec<String>>,
     since: Option<Since>,
     limit: Option<u32>,
@@ -72,6 +77,13 @@ pub enum QueryMsg {
     cursor: Option<(String, ContractID)>,
     meta: Option<bool>,
     wallet: Option<Addr>,
+  },
+  Select {
+    wallet: Option<Addr>,
+    fields: Option<Vec<String>>,
+  },
+  Values {
+    contract_addr: Addr,
   },
 }
 
@@ -103,10 +115,11 @@ pub struct SelectResponse {
 }
 
 #[cw_serde]
-pub struct ReadResponse {
-  pub page: Vec<ContractStateEnvelope>,
-  pub cursor: Option<(String, ContractID)>,
-  pub count: u8,
+pub enum Page {
+  Contracts {
+    page: Vec<ContractStateEnvelope>,
+    cursor: Option<(String, ContractID)>,
+  },
 }
 
 #[cw_serde]

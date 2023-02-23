@@ -41,6 +41,7 @@ pub fn execute(
       label,
       indices,
       preset,
+      tags,
     } => execute::create(
       deps,
       env,
@@ -51,6 +52,7 @@ pub fn execute(
       label,
       indices,
       preset,
+      tags,
     ),
     ExecuteMsg::CreateFromPreset {
       owner: preset_owner,
@@ -60,6 +62,7 @@ pub fn execute(
       admin,
       label,
       indices,
+      tags,
     } => execute::create_from_preset(
       deps,
       env,
@@ -71,8 +74,13 @@ pub fn execute(
       indices,
       preset_owner,
       preset,
+      tags,
     ),
-    ExecuteMsg::Update { values } => execute::update(deps, env, info, values),
+    ExecuteMsg::Update {
+      values,
+      relationships,
+      tags,
+    } => execute::update(deps, env, info, values, relationships, tags),
     ExecuteMsg::RenameIndex { name } => execute::rename_index(deps, env, info, name),
     ExecuteMsg::Remove { contract_addr } => execute::remove(deps, env, info, &contract_addr),
     ExecuteMsg::SetAcl { acl_contract_addr } => {
@@ -94,11 +102,11 @@ pub fn query(
   msg: QueryMsg,
 ) -> Result<Binary, ContractError> {
   let result = match msg {
-    QueryMsg::Select { fields } => to_binary(&query::select(deps, fields)?),
+    QueryMsg::Select { wallet, fields } => to_binary(&query::select(deps, fields, wallet)?),
     QueryMsg::Values { contract_addr } => to_binary(&query::values(deps, &contract_addr)?),
     QueryMsg::Count {} => to_binary(&query::count(deps)?),
     QueryMsg::Read {
-      index,
+      target,
       cursor,
       limit,
       desc,
@@ -107,7 +115,7 @@ pub fn query(
       meta,
       wallet,
     } => to_binary(&query::read(
-      deps, &index, desc, limit, fields, since, meta, wallet, cursor,
+      deps, &target, desc, limit, fields, since, meta, wallet, cursor,
     )?),
   }?;
   Ok(result)
