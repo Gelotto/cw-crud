@@ -1,10 +1,12 @@
+use std::collections::HashSet;
+
 use cosmwasm_std::{
   to_binary, Addr, Binary, Empty, QuerierWrapper, StdResult, Storage, Timestamp, WasmMsg,
 };
 
 use crate::{
   loader::RepositoryStateLoader,
-  models::{ContractID, IndexSlotValue, Relationship, RelationshipUpdates, Slot, TagUpdates},
+  models::{AddressTag, ContractID, IndexSlotValue, RelationshipUpdates, Slot, TagUpdates},
   msg::{ExecuteMsg, QueryMsg, Since, Target},
 };
 
@@ -63,10 +65,10 @@ impl Repository {
 pub struct UpdateBuilder {
   repo_contract_addr: Addr,
   values: Vec<IndexSlotValue>,
-  addr_tags_to_add: Vec<Relationship>,
-  addr_tags_to_delete: Vec<Relationship>,
-  tags_to_add: Vec<String>,
-  tags_to_delete: Vec<String>,
+  addr_tags_to_add: HashSet<AddressTag>,
+  addr_tags_to_delete: HashSet<AddressTag>,
+  tags_to_add: HashSet<String>,
+  tags_to_delete: HashSet<String>,
 }
 
 impl UpdateBuilder {
@@ -74,10 +76,10 @@ impl UpdateBuilder {
     Self {
       repo_contract_addr: repo_contract_addr.clone(),
       values: vec![],
-      tags_to_add: vec![],
-      tags_to_delete: vec![],
-      addr_tags_to_add: vec![],
-      addr_tags_to_delete: vec![],
+      tags_to_add: HashSet::new(),
+      tags_to_delete: HashSet::new(),
+      addr_tags_to_add: HashSet::new(),
+      addr_tags_to_delete: HashSet::new(),
     }
   }
 
@@ -131,41 +133,49 @@ impl UpdateBuilder {
 
   pub fn tag(
     mut self,
-    tag: impl Into<String>,
+    tags: Vec<impl Into<String>>,
   ) -> Self {
-    self.tags_to_add.push(tag.into());
+    for tag in tags.into_iter() {
+      self.tags_to_add.insert(tag.into());
+    }
     self
   }
 
   pub fn untag(
     mut self,
-    tag: impl Into<String>,
+    tags: Vec<impl Into<String>>,
   ) -> Self {
-    self.tags_to_delete.push(tag.into());
+    for tag in tags.into_iter() {
+      self.tags_to_delete.insert(tag.into());
+    }
     self
   }
 
   pub fn tag_address(
     mut self,
     addr: &Addr,
-    tag: impl Into<String>,
+    tags: Vec<impl Into<String>>,
   ) -> Self {
-    self.addr_tags_to_add.push(Relationship {
-      address: addr.clone(),
-      tag: tag.into(),
-    });
+    for tag in tags.into_iter() {
+      self.addr_tags_to_add.insert(AddressTag {
+        address: addr.clone(),
+        tag: tag.into(),
+      });
+    }
     self
   }
 
   pub fn untag_address(
     mut self,
     addr: &Addr,
-    tag: impl Into<String>,
+    tags: Vec<impl Into<String>>,
   ) -> Self {
-    self.addr_tags_to_delete.push(Relationship {
-      address: addr.clone(),
-      tag: tag.into(),
-    });
+    for tag in tags.into_iter() {
+      self.addr_tags_to_delete.insert(AddressTag {
+        address: addr.clone(),
+        tag: tag.into(),
+      });
+    }
     self
   }
 
@@ -177,24 +187,24 @@ impl UpdateBuilder {
     };
     let rel_updates = Some(RelationshipUpdates {
       added: if !self.addr_tags_to_add.is_empty() {
-        Some(self.addr_tags_to_add.clone())
+        Some(self.addr_tags_to_add.clone().into_iter().collect())
       } else {
         None
       },
       removed: if !self.addr_tags_to_delete.is_empty() {
-        Some(self.addr_tags_to_delete.clone())
+        Some(self.addr_tags_to_delete.clone().into_iter().collect())
       } else {
         None
       },
     });
     let tags = Some(TagUpdates {
       added: if !self.tags_to_add.is_empty() {
-        Some(self.tags_to_add.clone())
+        Some(self.tags_to_add.clone().into_iter().collect())
       } else {
         None
       },
       removed: if !self.tags_to_delete.is_empty() {
-        Some(self.tags_to_delete.clone())
+        Some(self.tags_to_delete.clone().into_iter().collect())
       } else {
         None
       },

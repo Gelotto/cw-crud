@@ -53,7 +53,8 @@ pub struct InstantiationPreset {
 }
 
 #[cw_serde]
-pub struct Relationship {
+#[derive(Eq, Hash)]
+pub struct AddressTag {
   pub address: Addr,
   pub tag: String,
 }
@@ -66,8 +67,8 @@ pub struct TagUpdates {
 
 #[cw_serde]
 pub struct RelationshipUpdates {
-  pub added: Option<Vec<Relationship>>,
-  pub removed: Option<Vec<Relationship>>,
+  pub added: Option<Vec<AddressTag>>,
+  pub removed: Option<Vec<AddressTag>>,
 }
 
 #[cw_serde]
