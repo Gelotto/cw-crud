@@ -104,11 +104,11 @@ impl UpdateBuilder {
   pub fn set_string(
     mut self,
     slot: Slot,
-    value: &String,
+    value: impl Into<String>,
   ) -> Self {
     self.values.push(IndexSlotValue::Text {
       slot,
-      value: Binary::from(value.as_bytes()).to_base64(),
+      value: Binary::from(value.into().as_bytes()).to_base64(),
     });
     self
   }
