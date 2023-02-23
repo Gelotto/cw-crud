@@ -4,9 +4,7 @@ use cosmwasm_std::{
 
 use crate::{
   loader::RepositoryStateLoader,
-  models::{
-    ContractID, IndexBounds, IndexSlotValue, Relationship, RelationshipUpdates, Slot, TagUpdates,
-  },
+  models::{ContractID, IndexSlotValue, Relationship, RelationshipUpdates, Slot, TagUpdates},
   msg::{ExecuteMsg, QueryMsg, Since, Target},
 };
 
@@ -147,26 +145,26 @@ impl UpdateBuilder {
     self
   }
 
-  pub fn set_relationship(
+  pub fn tag_address(
     mut self,
     addr: &Addr,
-    name: impl Into<String>,
+    tag: impl Into<String>,
   ) -> Self {
     self.addr_tags_to_add.push(Relationship {
       address: addr.clone(),
-      tag: name.into(),
+      tag: tag.into(),
     });
     self
   }
 
-  pub fn delete_relationship(
+  pub fn untag_address(
     mut self,
     addr: &Addr,
-    name: impl Into<String>,
+    tag: impl Into<String>,
   ) -> Self {
     self.addr_tags_to_delete.push(Relationship {
       address: addr.clone(),
-      tag: name.into(),
+      tag: tag.into(),
     });
     self
   }
