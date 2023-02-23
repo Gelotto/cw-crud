@@ -108,7 +108,7 @@ impl UpdateBuilder {
   ) -> Self {
     self.values.push(IndexSlotValue::Text {
       slot,
-      value: value.clone(),
+      value: Binary::from(value.as_bytes()).to_base64(),
     });
     self
   }
@@ -133,20 +133,24 @@ impl UpdateBuilder {
 
   pub fn tag(
     mut self,
-    tags: Vec<impl Into<String>>,
+    tags: Vec<&str>,
   ) -> Self {
-    for tag in tags.into_iter() {
-      self.tags_to_add.insert(tag.into());
+    for tag in tags.iter() {
+      self
+        .tags_to_add
+        .insert(Binary::from(tag.as_bytes()).to_base64());
     }
     self
   }
 
   pub fn untag(
     mut self,
-    tags: Vec<impl Into<String>>,
+    tags: Vec<&str>,
   ) -> Self {
-    for tag in tags.into_iter() {
-      self.tags_to_delete.insert(tag.into());
+    for tag in tags.iter() {
+      self
+        .tags_to_delete
+        .insert(Binary::from(tag.as_bytes()).to_base64());
     }
     self
   }
@@ -154,12 +158,12 @@ impl UpdateBuilder {
   pub fn tag_address(
     mut self,
     addr: &Addr,
-    tags: Vec<impl Into<String>>,
+    tags: Vec<&str>,
   ) -> Self {
-    for tag in tags.into_iter() {
+    for tag in tags.iter() {
       self.addr_tags_to_add.insert(AddressTag {
         address: addr.clone(),
-        tag: tag.into(),
+        tag: Binary::from(tag.as_bytes()).to_base64(),
       });
     }
     self
@@ -168,12 +172,12 @@ impl UpdateBuilder {
   pub fn untag_address(
     mut self,
     addr: &Addr,
-    tags: Vec<impl Into<String>>,
+    tags: Vec<&str>,
   ) -> Self {
-    for tag in tags.into_iter() {
+    for tag in tags.iter() {
       self.addr_tags_to_delete.insert(AddressTag {
         address: addr.clone(),
-        tag: tag.into(),
+        tag: Binary::from(tag.as_bytes()).to_base64(),
       });
     }
     self
@@ -185,7 +189,7 @@ impl UpdateBuilder {
     } else {
       None
     };
-    let rel_updates = Some(RelationshipUpdates {
+    let relationships = Some(RelationshipUpdates {
       added: if !self.addr_tags_to_add.is_empty() {
         Some(self.addr_tags_to_add.clone().into_iter().collect())
       } else {
@@ -213,25 +217,9 @@ impl UpdateBuilder {
       contract_addr: self.repo_contract_addr.clone().into(),
       funds: vec![],
       msg: to_binary(&ExecuteMsg::Update {
-        relationships: rel_updates,
+        relationships,
         tags,
-        // base64 encode string values
-        values: Some(
-          values
-            .unwrap_or(vec![])
-            .iter()
-            .map(|v| {
-              if let IndexSlotValue::Text { slot, value } = v {
-                IndexSlotValue::Text {
-                  slot: *slot,
-                  value: Binary::from(value.as_bytes()).to_base64(),
-                }
-              } else {
-                v.clone()
-              }
-            })
-            .collect(),
-        ),
+        values,
       })?,
     })
   }
