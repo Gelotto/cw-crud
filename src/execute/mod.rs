@@ -6,7 +6,7 @@ mod set_acl;
 mod update;
 mod update_allowed_code_ids;
 
-pub use create::{create, create_from_preset};
+pub use create::create_from_preset;
 pub use remove::remove;
 pub use remove_preset::remove_preset;
 pub use rename_index::rename_index;

@@ -2,8 +2,8 @@ use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{Addr, Binary, Timestamp};
 
 use crate::models::{
-  ContractID, ContractMetadata, IndexBounds, IndexMetadataView, IndexSlotName, IndexSlotValue,
-  IndexedValues, RelationshipUpdates, TagUpdates,
+  AddressTag, ContractID, ContractMetadata, IndexBounds, IndexMetadataView, IndexSlotName,
+  IndexSlotValue, IndexedValues, RelationshipUpdates, TagUpdates,
 };
 
 #[cw_serde]
@@ -19,22 +19,14 @@ pub struct InstantiateMsg {
 pub enum ExecuteMsg {
   Create {
     code_id: Option<u64>,
-    msg: Binary,
-    admin: Option<Addr>,
-    label: Option<String>,
-    indices: Option<Vec<IndexSlotValue>>,
-    preset: Option<String>,
-    tags: Option<Vec<String>>,
-  },
-  CreateFromPreset {
-    owner: Addr,
-    preset: String,
-    code_id: Option<u64>,
     msg: Option<Binary>,
     admin: Option<Addr>,
     label: Option<String>,
     indices: Option<Vec<IndexSlotValue>>,
+    preset: Option<String>,
+    save_as: Option<String>,
     tags: Option<Vec<String>>,
+    address_tags: Option<Vec<AddressTag>>,
   },
   RemovePreset {
     preset: String,

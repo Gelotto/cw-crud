@@ -104,11 +104,11 @@ impl UpdateBuilder {
   pub fn set_string(
     mut self,
     slot: Slot,
-    value: impl Into<String>,
+    value: &str,
   ) -> Self {
     self.values.push(IndexSlotValue::Text {
       slot,
-      value: Binary::from(value.into().as_bytes()).to_base64(),
+      value: Binary::from(value.clone().as_bytes()).to_base64(),
     });
     self
   }
@@ -143,6 +143,20 @@ impl UpdateBuilder {
     self
   }
 
+  pub fn retag(
+    mut self,
+    old_tag: &str,
+    new_tag: &str,
+  ) -> Self {
+    self
+      .tags_to_delete
+      .insert(Binary::from(old_tag.as_bytes()).to_base64());
+    self
+      .tags_to_add
+      .insert(Binary::from(new_tag.as_bytes()).to_base64());
+    self
+  }
+
   pub fn untag(
     mut self,
     tags: Vec<&str>,
@@ -152,6 +166,23 @@ impl UpdateBuilder {
         .tags_to_delete
         .insert(Binary::from(tag.as_bytes()).to_base64());
     }
+    self
+  }
+
+  pub fn retag_address(
+    mut self,
+    addr: &Addr,
+    old_tag: &str,
+    new_tag: &str,
+  ) -> Self {
+    self.addr_tags_to_delete.insert(AddressTag {
+      address: addr.clone(),
+      tag: Binary::from(old_tag.as_bytes()).to_base64(),
+    });
+    self.addr_tags_to_add.insert(AddressTag {
+      address: addr.clone(),
+      tag: Binary::from(new_tag.as_bytes()).to_base64(),
+    });
     self
   }
 

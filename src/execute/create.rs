@@ -1,11 +1,11 @@
 use crate::{
   error::ContractError,
-  models::{IndexSlotValue, IndexedValues, InstantiationPreset, SLOT_COUNT},
+  models::{AddressTag, IndexSlotValue, IndexedValues, InstantiationPreset, SLOT_COUNT},
   state::{
     get_bool_index, get_next_contract_id, get_text_index, get_timestamp_index, get_u128_index,
     get_u64_index, increment_index_size, is_allowed, ALLOWED_CODE_IDS, DEFAULT_CODE_ID,
     DEFAULT_LABEL, ID_2_INDEXED_VALUES, IX_CREATED_BY, IX_META_BOOL, IX_META_STRING,
-    IX_META_TIMESTAMP, IX_META_U128, IX_META_U64, PRESETS, TAGGED_CONTRACT_IDS,
+    IX_META_TIMESTAMP, IX_META_U128, IX_META_U64, PRESETS, RELATIONSHIPS, TAGGED_CONTRACT_IDS,
   },
 };
 use cosmwasm_std::{
@@ -13,7 +13,7 @@ use cosmwasm_std::{
 };
 
 /// Instantiate a managed contract. Extract its address in the reply entrypoint.
-pub fn create(
+fn create(
   deps: DepsMut,
   env: Env,
   info: MessageInfo,
@@ -22,8 +22,9 @@ pub fn create(
   maybe_admin: Option<Addr>,
   maybe_label: Option<String>,
   maybe_indices: Option<Vec<IndexSlotValue>>,
-  maybe_preset_name: Option<String>,
+  maybe_save_as_preset_name: Option<String>,
   maybe_tags: Option<Vec<String>>,
+  maybe_address_tags: Option<Vec<AddressTag>>,
 ) -> Result<Response, ContractError> {
   // the signer must be authorized to this method by the ACL
   if !is_allowed(deps.storage, &deps.querier, &info.sender, "create")? {
@@ -48,6 +49,12 @@ pub fn create(
   // store contract in association with the given tags
   for tag in maybe_tags.clone().unwrap_or_else(|| vec![]).iter() {
     TAGGED_CONTRACT_IDS.save(deps.storage, (tag.clone(), contract_id), &true)?;
+  }
+
+  // store tagged addresses
+  for addr_tag in maybe_address_tags.unwrap_or(vec![]).iter() {
+    let key = (addr_tag.address.clone(), addr_tag.tag.clone(), contract_id);
+    RELATIONSHIPS.save(deps.storage, key, &true)?;
   }
 
   IX_CREATED_BY.save(deps.storage, (info.sender.clone(), contract_id), &true)?;
@@ -125,7 +132,7 @@ pub fn create(
     admin: computed_admin.clone(),
   };
 
-  if let Some(preset_name) = &maybe_preset_name {
+  if let Some(preset_name) = &maybe_save_as_preset_name {
     PRESETS.update(
       deps.storage,
       (info.sender.clone(), preset_name.clone()),
@@ -169,24 +176,41 @@ pub fn create_from_preset(
   maybe_admin: Option<Addr>,
   maybe_label: Option<String>,
   maybe_indices: Option<Vec<IndexSlotValue>>,
-  owner_addr: Addr,
-  preset_name: String,
+  maybe_preset_name: Option<String>,
+  maybe_save_as_preset_name: Option<String>,
   maybe_tags: Option<Vec<String>>,
+  maybe_address_tags: Option<Vec<AddressTag>>,
 ) -> Result<Response, ContractError> {
-  let preset = PRESETS.load(deps.storage, (owner_addr.clone(), preset_name.clone()))?;
-
-  create(
-    deps,
-    env,
-    info,
-    maybe_code_id.or(preset.code_id),
-    &maybe_instantiate_msg.unwrap_or(preset.msg),
-    maybe_admin.or(preset.admin),
-    maybe_label.or(preset.label),
-    maybe_indices.or(preset.indices),
-    None,
-    maybe_tags,
-  )
+  if let Some(preset_name) = maybe_preset_name {
+    let preset = PRESETS.load(deps.storage, (info.sender.clone(), preset_name.clone()))?;
+    create(
+      deps,
+      env,
+      info,
+      maybe_code_id.or(preset.code_id),
+      &maybe_instantiate_msg.unwrap_or(preset.msg),
+      maybe_admin.or(preset.admin),
+      maybe_label.or(preset.label),
+      maybe_indices.or(preset.indices),
+      maybe_save_as_preset_name,
+      maybe_tags,
+      maybe_address_tags,
+    )
+  } else {
+    create(
+      deps,
+      env,
+      info,
+      maybe_code_id,
+      &maybe_instantiate_msg.unwrap_or(Binary::from_base64("e30=")?),
+      maybe_admin,
+      maybe_label,
+      maybe_indices,
+      maybe_save_as_preset_name,
+      maybe_tags,
+      maybe_address_tags,
+    )
+  }
 }
 
 /// Build or use default label for instantiated contract.
