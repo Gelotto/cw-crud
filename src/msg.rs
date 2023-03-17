@@ -3,7 +3,7 @@ use cosmwasm_std::{Addr, Binary, Timestamp};
 
 use crate::models::{
   AddressTag, ContractID, ContractMetadata, IndexBounds, IndexMetadataView, IndexSlotName,
-  IndexSlotValue, IndexedValues, RelationshipUpdates, TagUpdates,
+  IndexSlotValue, IndexedValues, InstantiationPreset, RelationshipUpdates, TagUpdates,
 };
 
 #[cw_serde]
@@ -26,7 +26,7 @@ pub enum ExecuteMsg {
     preset: Option<String>,
     save_as: Option<String>,
     tags: Option<Vec<String>>,
-    address_tags: Option<Vec<AddressTag>>,
+    relationships: Option<Vec<AddressTag>>,
   },
   RemovePreset {
     preset: String,
@@ -45,7 +45,7 @@ pub enum ExecuteMsg {
   SetAcl {
     acl_contract_addr: Addr,
   },
-  UpdateAllowedCodeIdes {
+  UpdateAllowedCodeIds {
     code_ids: Vec<u64>,
   },
 }
@@ -104,14 +104,13 @@ pub struct SelectResponse {
   pub code_ids: Option<Vec<u64>>,
   pub acl_address: Option<Option<Addr>>,
   pub indices: Option<IndexMetadataView>,
+  pub presets: Option<Vec<InstantiationPreset>>,
 }
 
 #[cw_serde]
-pub enum Page {
-  Contracts {
-    page: Vec<ContractStateEnvelope>,
-    cursor: Option<(String, ContractID)>,
-  },
+pub struct Page {
+  pub page: Vec<EntityContractEnvelope>,
+  pub cursor: Option<(String, ContractID)>,
 }
 
 #[cw_serde]
@@ -123,7 +122,7 @@ pub enum ImplementorQueryMsg {
 }
 
 #[cw_serde]
-pub struct ContractStateEnvelope {
+pub struct EntityContractEnvelope {
   pub address: Addr,
   pub meta: Option<ContractMetadata>,
   pub state: Option<Binary>,

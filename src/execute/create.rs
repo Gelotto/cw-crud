@@ -139,6 +139,7 @@ fn create(
       |maybe_preset| -> Result<InstantiationPreset, ContractError> {
         if maybe_preset.is_none() {
           Ok(InstantiationPreset {
+            name: Some(preset_name.clone()),
             code_id: Some(code_id),
             msg: instantiate_msg.clone(),
             tags: maybe_tags.clone(),

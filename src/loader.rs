@@ -1,6 +1,6 @@
 use std::{collections::HashSet, iter::FromIterator};
 
-use cosmwasm_std::{StdResult, Storage};
+use cosmwasm_std::{Addr, StdResult, Storage};
 use cw_storage_plus::Item;
 use serde::{de::DeserializeOwned, Serialize};
 
@@ -50,6 +50,25 @@ impl<'a> RepositoryStateLoader<'a> {
   {
     if self.fields.is_empty() || self.fields.contains(&field.to_owned()) {
       func()
+    } else {
+      Ok(None)
+    }
+  }
+
+  pub fn view_by_wallet<T, F>(
+    &self,
+    field: &str,
+    maybe_wallet: Option<Addr>,
+    func: F,
+  ) -> StdResult<Option<T>>
+  where
+    F: Fn(&Addr) -> StdResult<Option<T>>,
+  {
+    if self.fields.is_empty() || self.fields.contains(&field.to_owned()) {
+      if let Some(wallet) = &maybe_wallet {
+        return func(wallet);
+      }
+      Ok(None)
     } else {
       Ok(None)
     }

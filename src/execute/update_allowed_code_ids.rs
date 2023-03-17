@@ -25,7 +25,7 @@ pub fn update_allowed_code_ids(
   }
 
   Ok(Response::new().add_attributes(vec![
-    attr("action", "set_acl"),
+    attr("action", "update_allowed_code_ids"),
     attr("code_ids", format!("{:?}", code_ids)),
   ]))
 }

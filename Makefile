@@ -33,11 +33,17 @@ schemas:
 validator:
 	./bin/validator
 
-execute-create:
+create:
 	./client.sh create $(network) $(contract_addr_filepath) $(sender) $(instantiate_msg)
 
-execute-enable-acl:
-	./client.sh enable-acl $(network) $(contract_addr_filepath) $(sender)
+set-acl:
+	./client.sh set-acl $(network) $(contract_addr_filepath) $(sender) $(acl_contract_addr)
+
+remove:
+	./client.sh remove $(network) $(contract_addr_filepath) $(sender) $(contract_addr)
+
+update-allowed-code-ids:
+	./client.sh update-allowed-code-ids $(network) $(contract_addr_filepath) $(sender) $(code_ids)
 
 query-count:
 	./client.sh count $(network) $(contract_addr_filepath) $(sender)

@@ -7,7 +7,7 @@ use crate::state::{
 };
 use crate::{execute, query};
 use cosmwasm_std::{
-  entry_point, to_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, Reply, Response,
+  entry_point, to_binary, Addr, Binary, Deps, DepsMut, Env, MessageInfo, Reply, Response
 };
 use cw2::set_contract_version;
 
@@ -43,7 +43,7 @@ pub fn execute(
       preset,
       save_as,
       tags,
-      address_tags,
+      relationships,
     } => execute::create_from_preset(
       deps,
       env,
@@ -56,7 +56,7 @@ pub fn execute(
       preset,
       save_as,
       tags,
-      address_tags,
+      relationships,
     ),
     ExecuteMsg::Update {
       values,
@@ -68,7 +68,7 @@ pub fn execute(
     ExecuteMsg::SetAcl { acl_contract_addr } => {
       execute::set_acl(deps, env, info, &acl_contract_addr)
     },
-    ExecuteMsg::UpdateAllowedCodeIdes { code_ids } => {
+    ExecuteMsg::UpdateAllowedCodeIds { code_ids } => {
       execute::update_allowed_code_ids(deps, env, info, code_ids)
     },
     ExecuteMsg::RemovePreset {
@@ -174,5 +174,14 @@ pub fn reply(
       return Err(ContractError::CreateFailed {});
     },
   }
+  Ok(Response::default())
+}
+
+#[entry_point]
+pub fn migrate(
+  _deps: DepsMut,
+  _env: Env,
+  _msg: MigrateMsg,
+) -> Result<Response, ContractError> {
   Ok(Response::default())
 }

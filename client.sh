@@ -16,7 +16,7 @@ case $NETWORK in
     DENOM=ujunox
     ;;
   mainnet)
-    NODE="https://rpc-juno.itastakers.com",
+    NODE="https://rpc-juno.itastakers.com:443"
     CHAIN_ID=juno-1
     DENOM=ujuno
     ;;
@@ -50,9 +50,51 @@ create() {
   echo $response | ./bin/utils/base64-decode-attributes | jq
 }
 
+update-allowed-code-ids() {
+  sender=$1
+  code_ids_json_array=$2
+  msg='{"update_allowed_code_ides":{"code_ids":'$code_ids_json_array'}}'
+  flags="\
+  --node $NODE \
+  --gas-prices 0.025$DENOM \
+  --chain-id $CHAIN_ID \
+  --from $sender \
+  --gas auto \
+  --gas-adjustment 1.5 \
+  --broadcast-mode block \
+  --output json \
+  -y \
+  "
+  echo junod tx wasm execute $CONTRACT_ADDR "$msg" "$flags"
+  response=$(junod tx wasm execute "$CONTRACT_ADDR" "$msg" $flags)
+  echo $response | ./bin/utils/base64-decode-attributes | jq
+}
+
+
+remove() {
+  sender=$1
+  contract_addr=$2
+  msg='{"remove":{"contract_addr":"'$contract_addr'"}}'
+  flags="\
+  --node $NODE \
+  --gas-prices 0.025$DENOM \
+  --chain-id $CHAIN_ID \
+  --from $sender \
+  --gas auto \
+  --gas-adjustment 1.5 \
+  --broadcast-mode block \
+  --output json \
+  -y \
+  "
+  echo junod tx wasm execute $CONTRACT_ADDR "$msg" "$flags"
+  response=$(junod tx wasm execute "$CONTRACT_ADDR" "$msg" $flags)
+  echo $response | ./bin/utils/base64-decode-attributes | jq
+}
+
 enable-acl() {
   sender=$1
-  msg='{"enable_acl":{}}'
+  acl_contract_addr=$2
+  msg='{"set_acl":{"acl_contract_addr":"'$acl_contract_addr'"}}'
   flags="\
   --node $NODE \
   --gas-prices 0.025$DENOM \
@@ -120,8 +162,14 @@ case $CMD in
   create)
     create $1 $2
     ;;
-  enable-acl)
-    enable-acl $1
+  set-acl)
+    enable-acl $1 $2
+    ;;
+  remove)
+    remove $1 $2
+    ;;
+  update-allowed-code-ids)
+    update-allowed-code-ids $1 $2
     ;;
   count) 
     count

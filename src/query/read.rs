@@ -9,7 +9,7 @@ use cw_storage_plus::{Bound, Map, PrefixBound};
 use crate::{
   error::ContractError,
   models::{ContractID, IndexBounds},
-  msg::{ContractStateEnvelope, ImplementorQueryMsg, Page, Since, Target},
+  msg::{EntityContractEnvelope, ImplementorQueryMsg, Page, Since, Target},
   state::{
     get_bool_index, get_text_index, get_timestamp_index, get_u128_index, get_u64_index, ID_2_ADDR,
     IX_CODE_ID, IX_CREATED_AT, IX_CREATED_BY, IX_HEIGHT, IX_REV, IX_UPDATED_AT, METADATA,
@@ -93,7 +93,7 @@ fn build_contracts_page(
   maybe_meta: Option<bool>,
   maybe_wallet: Option<Addr>,
 ) -> Result<Page, ContractError> {
-  let mut page_data: Vec<ContractStateEnvelope> = Vec::with_capacity(keys.len());
+  let mut page_data: Vec<EntityContractEnvelope> = Vec::with_capacity(keys.len());
   let next_cursor: Option<(String, ContractID)> =
     keys.last().and_then(|x| Some(x.clone())).or(None);
 
@@ -140,14 +140,14 @@ fn build_contracts_page(
       None
     };
 
-    page_data.push(ContractStateEnvelope {
+    page_data.push(EntityContractEnvelope {
       address: contract_addr.clone(),
       meta: some_meta,
       state,
     })
   }
 
-  Ok(Page::Contracts {
+  Ok(Page {
     page: page_data,
     cursor: next_cursor,
   })
@@ -227,14 +227,14 @@ fn read_relationship(
       },
     }
   } else {
-    map.range(
+    map.prefix_range(
       deps.storage,
-      Some(Bound::Inclusive((
-        (rel_subject_addr.clone(), rel_name.clone(), ContractID::MIN),
+      Some(PrefixBound::Inclusive((
+        (rel_subject_addr.clone(), rel_name.clone()),
         PhantomData,
       ))),
-      Some(Bound::Inclusive((
-        (rel_subject_addr.clone(), rel_name.clone(), ContractID::MAX),
+      Some(PrefixBound::Inclusive((
+        (rel_subject_addr.clone(), rel_name.clone()),
         PhantomData,
       ))),
       order,

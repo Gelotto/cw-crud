@@ -12,7 +12,7 @@ use crate::{
   },
   state::{owns_contract, IX_UPDATED_AT},
 };
-use cosmwasm_std::{attr, DepsMut, Env, MessageInfo, Response, Storage, Timestamp};
+use cosmwasm_std::{attr, Api, DepsMut, Env, MessageInfo, Response, Storage, Timestamp};
 use cw_storage_plus::Map;
 
 pub fn update(
@@ -38,7 +38,7 @@ pub fn update(
   let contract_id = get_contract_id(deps.storage, contract_addr)?;
 
   if let Some(rel_updates) = maybe_relationship_updates {
-    update_relationships(deps.storage, contract_id, &rel_updates)?;
+    update_relationships(deps.storage, deps.api, contract_id, &rel_updates)?;
   }
 
   if let Some(tag_updates) = maybe_tag_updates {
@@ -319,6 +319,7 @@ fn update_contract_tags(
 
 fn update_relationships(
   storage: &mut dyn Storage,
+  api: &dyn Api,
   contract_id: ContractID,
   rel_updates: &RelationshipUpdates,
 ) -> Result<(), ContractError> {
@@ -326,6 +327,7 @@ fn update_relationships(
     RELATIONSHIPS.remove(storage, (rel.address.clone(), rel.tag.clone(), contract_id))
   }
   for rel in rel_updates.added.as_ref().unwrap_or(&vec![]).iter() {
+    api.debug(format!("adding '{}' relationship for {:?}", rel.tag, rel.address).as_str());
     RELATIONSHIPS.save(
       storage,
       (rel.address.clone(), rel.tag.clone(), contract_id),

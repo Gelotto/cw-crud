@@ -65,21 +65,21 @@ impl Repository {
 pub struct UpdateBuilder {
   repo_contract_addr: Addr,
   values: Vec<IndexSlotValue>,
-  addr_tags_to_add: HashSet<AddressTag>,
-  addr_tags_to_delete: HashSet<AddressTag>,
+  rels_to_add: HashSet<AddressTag>,
+  rels_to_remove: HashSet<AddressTag>,
   tags_to_add: HashSet<String>,
-  tags_to_delete: HashSet<String>,
+  tags_to_remove: HashSet<String>,
 }
 
 impl UpdateBuilder {
   pub fn new(repo_contract_addr: &Addr) -> Self {
     Self {
       repo_contract_addr: repo_contract_addr.clone(),
-      values: vec![],
+      values: Vec::with_capacity(1),
       tags_to_add: HashSet::new(),
-      tags_to_delete: HashSet::new(),
-      addr_tags_to_add: HashSet::new(),
-      addr_tags_to_delete: HashSet::new(),
+      tags_to_remove: HashSet::new(),
+      rels_to_add: HashSet::new(),
+      rels_to_remove: HashSet::new(),
     }
   }
 
@@ -131,7 +131,7 @@ impl UpdateBuilder {
     self
   }
 
-  pub fn tag(
+  pub fn add_tags(
     mut self,
     tags: Vec<&str>,
   ) -> Self {
@@ -143,13 +143,20 @@ impl UpdateBuilder {
     self
   }
 
-  pub fn retag(
+  pub fn add_tag(
+    self,
+    tag: &str,
+  ) -> Self {
+    self.add_tags(vec![tag])
+  }
+
+  pub fn change_tag(
     mut self,
     old_tag: &str,
     new_tag: &str,
   ) -> Self {
     self
-      .tags_to_delete
+      .tags_to_remove
       .insert(Binary::from(old_tag.as_bytes()).to_base64());
     self
       .tags_to_add
@@ -157,61 +164,84 @@ impl UpdateBuilder {
     self
   }
 
-  pub fn untag(
+  pub fn remove_tags(
     mut self,
     tags: Vec<&str>,
   ) -> Self {
     for tag in tags.iter() {
       self
-        .tags_to_delete
+        .tags_to_remove
         .insert(Binary::from(tag.as_bytes()).to_base64());
     }
     self
   }
 
-  pub fn retag_address(
+  pub fn remove_tag(
+    self,
+    tag: &str,
+  ) -> Self {
+    self.remove_tags(vec![tag])
+  }
+
+  pub fn change_relationship(
     mut self,
     addr: &Addr,
-    old_tag: &str,
-    new_tag: &str,
+    old_name: &str,
+    new_name: &str,
   ) -> Self {
-    self.addr_tags_to_delete.insert(AddressTag {
+    self.rels_to_remove.insert(AddressTag {
       address: addr.clone(),
-      tag: Binary::from(old_tag.as_bytes()).to_base64(),
+      tag: Binary::from(old_name.as_bytes()).to_base64(),
     });
-    self.addr_tags_to_add.insert(AddressTag {
+    self.rels_to_add.insert(AddressTag {
       address: addr.clone(),
-      tag: Binary::from(new_tag.as_bytes()).to_base64(),
+      tag: Binary::from(new_name.as_bytes()).to_base64(),
     });
     self
   }
 
-  pub fn tag_address(
+  pub fn add_relationships(
     mut self,
     addr: &Addr,
-    tags: Vec<&str>,
+    names: Vec<&str>,
   ) -> Self {
-    for tag in tags.iter() {
-      self.addr_tags_to_add.insert(AddressTag {
+    for name in names.iter() {
+      self.rels_to_add.insert(AddressTag {
         address: addr.clone(),
-        tag: Binary::from(tag.as_bytes()).to_base64(),
+        tag: Binary::from(name.as_bytes()).to_base64(),
       });
     }
     self
   }
 
-  pub fn untag_address(
+  pub fn add_relationship(
+    self,
+    addr: &Addr,
+    name: &str,
+  ) -> Self {
+    self.add_relationships(addr, vec![name])
+  }
+
+  pub fn remove_relationships(
     mut self,
     addr: &Addr,
-    tags: Vec<&str>,
+    names: Vec<&str>,
   ) -> Self {
-    for tag in tags.iter() {
-      self.addr_tags_to_delete.insert(AddressTag {
+    for name in names.iter() {
+      self.rels_to_remove.insert(AddressTag {
         address: addr.clone(),
-        tag: Binary::from(tag.as_bytes()).to_base64(),
+        tag: Binary::from(name.as_bytes()).to_base64(),
       });
     }
     self
+  }
+
+  pub fn remove_relationship(
+    self,
+    addr: &Addr,
+    name: &str,
+  ) -> Self {
+    self.remove_relationships(addr, vec![name])
   }
 
   pub fn build_msg(&self) -> StdResult<WasmMsg> {
@@ -221,13 +251,13 @@ impl UpdateBuilder {
       None
     };
     let relationships = Some(RelationshipUpdates {
-      added: if !self.addr_tags_to_add.is_empty() {
-        Some(self.addr_tags_to_add.clone().into_iter().collect())
+      added: if !self.rels_to_add.is_empty() {
+        Some(self.rels_to_add.clone().into_iter().collect())
       } else {
         None
       },
-      removed: if !self.addr_tags_to_delete.is_empty() {
-        Some(self.addr_tags_to_delete.clone().into_iter().collect())
+      removed: if !self.rels_to_remove.is_empty() {
+        Some(self.rels_to_remove.clone().into_iter().collect())
       } else {
         None
       },
@@ -238,8 +268,8 @@ impl UpdateBuilder {
       } else {
         None
       },
-      removed: if !self.tags_to_delete.is_empty() {
-        Some(self.tags_to_delete.clone().into_iter().collect())
+      removed: if !self.tags_to_remove.is_empty() {
+        Some(self.tags_to_remove.clone().into_iter().collect())
       } else {
         None
       },

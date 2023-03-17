@@ -44,6 +44,7 @@ impl IndexMetadata {
 
 #[cw_serde]
 pub struct InstantiationPreset {
+  pub name: Option<String>,
   pub code_id: Option<u64>,
   pub msg: Binary,
   pub admin: Option<Addr>,
